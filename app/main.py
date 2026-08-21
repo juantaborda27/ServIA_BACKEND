@@ -1,7 +1,17 @@
 from fastapi import FastAPI
 
-app = FastAPI()  # <-- Esta variable DEBE llamarse 'app'
+from app.routers import auth
+
+app = FastAPI(
+    title="DataBaseServIA API",
+    description="API para plataforma de servicios de Valledupar",
+    version="1.0.0"
+)
+
+app.include_router(auth.router)
 
 @app.get("/")
-def read_root():
-    return {"mensaje": "¡ServIA Backend activo!"}
+def root():
+    return {
+        "message": "Bienvenido a la API de DataBaseServIA",
+    }
