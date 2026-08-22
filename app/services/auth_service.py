@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 from app.repositories.auth_repository import AuthRepository
-from app.schemas.auth import RegisterRequest, LoginRequest
+from app.schemas.auth import RegisterRequest, LoginRequest, RefreshRequest
 
 
 class AuthService:
@@ -36,4 +36,20 @@ class AuthService:
             "access_token": response.session.access_token,
             "refresh_token": response.session.refresh_token,
             "user_id": response.user.id
+        }
+
+    def refresh(self, data: RefreshRequest) -> dict:
+
+        response = self.repository.refresh_session(data)
+
+        if not response.session:
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token inválido o expirado"
+            )
+
+        return {
+            "access_token": response.session.access_token,
+            "refresh_token": response.session.refresh_token
         }
