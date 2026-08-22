@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.schemas.auth import RegisterRequest, LoginRequest
+from app.schemas.auth import RegisterRequest, LoginRequest, RefreshRequest
 from app.services.auth_service import AuthService
 
 router = APIRouter(
@@ -18,3 +18,8 @@ def register(data: RegisterRequest):
 @router.post("/login")
 def login(data: LoginRequest):
     return auth_service.login(data)
+
+@router.post("/refresh")
+def refresh(data: RefreshRequest):
+
+    return auth_service.refresh(data)
