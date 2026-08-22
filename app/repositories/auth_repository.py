@@ -1,5 +1,5 @@
 from app.core.supabase import supabase
-from app.schemas.auth import RegisterRequest, LoginRequest
+from app.schemas.auth import RegisterRequest, LoginRequest, RefreshRequest
 
 
 class AuthRepository:
@@ -22,3 +22,15 @@ class AuthRepository:
             "email": data.email,
             "password": data.password
         })
+
+    def refresh_session(self, data: RefreshRequest):
+
+        return supabase.auth.refresh_session(
+            data.refresh_token
+        )
+
+    def logout_user(self, access_token: str):
+
+        return supabase.auth.admin.sign_out(
+            access_token
+        )
