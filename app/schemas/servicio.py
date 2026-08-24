@@ -2,13 +2,14 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from decimal import Decimal
+from pydantic import BaseModel, Field
 
 class ServicioBase(BaseModel):
     nombre: str
     descripcion: str
-    precioDesde: Decimal
-    precioHasta: Decimal
-    duracionEstimada: int
+    precio_desde: Decimal = Field(alias="precioDesde")
+    precio_hasta: Decimal = Field(alias="precioHasta")
+    duracion_estimada: int = Field(alias="duracionEstimada")
     categoria_id: str
 
 class ServicioCreate(ServicioBase):
