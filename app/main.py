@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth
 from app.routers import usuario
 from app.routers import servicios
+from app.routers import post
 
 app = FastAPI(
     title="DataBaseServIA API",
@@ -22,6 +23,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(usuario.router)
 app.include_router(servicios.router)
+app.include_router(post.router)
 
 # 4. Ruta raíz
 @app.get("/")
