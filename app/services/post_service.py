@@ -109,3 +109,5 @@ class PublicacionService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permiso sobre esta publicación"
             )
+    def get_publicaciones_by_usuario(self, usuario_id: str):
+        return self.repository.list(usuario_id=usuario_id)
