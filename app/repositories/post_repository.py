@@ -80,4 +80,4 @@ class PublicacionRepository:
             .execute()
         )
 
-        return response.data
+        return response.data[0] if response.data else None
