@@ -51,14 +51,18 @@ def list_publicaciones(
         offset=offset,
     )
 
+
 @router.get("/categorias-prestador")
 def get_publicaciones_categorias_prestador(
     current_user=Depends(get_current_user)
 ):
     return publicacion_service.list_publicaciones(
         prestador_id=current_user.id,
-        incluir_usuario=True
+        estado="activo",
+        incluir_usuario=True,
+        incluir_categoria=True,
     )
+
 
 @router.get("/mis-publicaciones")
 def get_publicaciones_by_usuario(
@@ -67,6 +71,8 @@ def get_publicaciones_by_usuario(
     return publicacion_service.get_publicaciones_by_usuario(
         usuario_id=current_user.id
     )
+
+
 @router.get("/{publicacion_id}")
 def get_publicacion(publicacion_id: str):
 
