@@ -48,6 +48,7 @@ class PublicacionService:
     def list_publicaciones(
         self,
         estado: Optional[str] = None,
+        prestador_id: Optional[str] = None,
         categoria_id: Optional[str] = None,
         usuario_id: Optional[str] = None,
         limit: int = 20,
@@ -56,6 +57,7 @@ class PublicacionService:
 
         return self.repository.list(
             estado=estado,
+            prestador_id=prestador_id,
             categoria_id=categoria_id,
             usuario_id=usuario_id,
             limit=limit,

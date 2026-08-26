@@ -31,6 +31,7 @@ class PublicacionRepository:
 
     def list(
         self,
+        prestador_id: Optional[str] = None,
         estado: Optional[str] = None,
         categoria_id: Optional[str] = None,
         usuario_id: Optional[str] = None,
@@ -39,6 +40,22 @@ class PublicacionRepository:
     ):
 
         query = supabase.table("publicaciones").select("*")
+
+        if prestador_id:
+            # 1. Traemos las categorías del prestador
+            especialidades = (
+                supabase.table("especialidades")
+                .select("categoria_id")
+                .eq("prestador_id", prestador_id)
+                .execute()
+            )
+            categoria_ids = [row["categoria_id"] for row in especialidades.data]
+
+            if not categoria_ids:
+                return []  # sin especialidades declaradas -> no ve nada
+
+            # 2. Filtramos publicaciones solo dentro de esas categorías
+            query = query.in_("categoria_id", categoria_ids)
 
         if estado:
             query = query.eq("estado", estado)
@@ -55,6 +72,9 @@ class PublicacionRepository:
             .range(offset, offset + limit - 1)
             .execute()
         )
+        print("DEBUG categoria_ids:", categoria_ids)
+        print("DEBUG cantidad publicaciones encontradas:", len(response.data))
+        print("DEBUG respuesta cruda:", response.data)
 
         return response.data
 
