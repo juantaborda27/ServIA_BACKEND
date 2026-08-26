@@ -29,7 +29,7 @@ class PrestadorRepository:
 
         return response.data
 
-    def list(
+    def list_all(
         self,
         disponible: Optional[bool] = None,
         verificado: Optional[bool] = None,
