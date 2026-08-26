@@ -23,9 +23,12 @@ class PrestadorRepository:
             .table("prestadores")
             .select("*, categorias:especialidades(categoria:categorias(*))")
             .eq("id", prestador_id)
-            .single()
+            .maybe_single()
             .execute()
         )
+
+        if response is None:
+            return None
 
         return response.data
 
