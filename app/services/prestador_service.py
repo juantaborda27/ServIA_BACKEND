@@ -107,6 +107,18 @@ class PrestadorService:
     @staticmethod
     def _flatten_categorias(prestador: dict) -> dict:
 
+        # Sacar usuario
+        usuario = prestador.pop("usuario", None)
+
+        if usuario:
+            prestador["nombre_completo"] = usuario.get("nombre_completo")
+            prestador["telefono"] = usuario.get("telefono")
+            prestador["foto_perfil"] = usuario.get("foto_perfil")
+            prestador["ubicacion"] = usuario.get("ubicacion")
+            prestador["fecha_registro"] = usuario.get("fecha_registro")
+            prestador["activo"] = usuario.get("activo")
+
+        # Aplanar categorías
         raw = prestador.pop("categorias", []) or []
 
         prestador["categorias"] = [

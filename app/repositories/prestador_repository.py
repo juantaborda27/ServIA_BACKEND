@@ -21,7 +21,21 @@ class PrestadorRepository:
         response = (
             supabase
             .table("prestadores")
-            .select("*, categorias:especialidades(categoria:categorias(*))")
+            .select("""
+                *,
+                usuario:usuarios(
+                    id,
+                    nombre_completo,
+                    telefono,
+                    foto_perfil,
+                    ubicacion,
+                    fecha_registro,
+                    activo
+                ),
+                categorias:especialidades(
+                    categoria:categorias(*)
+                )
+            """)
             .eq("id", prestador_id)
             .maybe_single()
             .execute()
@@ -32,6 +46,7 @@ class PrestadorRepository:
 
         return response.data
 
+
     def list_all(
         self,
         disponible: Optional[bool] = None,
@@ -41,9 +56,21 @@ class PrestadorRepository:
         offset: int = 0,
     ):
 
-        query = supabase.table("prestadores").select(
-            "*, categorias:especialidades(categoria:categorias(*))"
-        )
+        query = supabase.table("prestadores").select("""
+            *,
+            usuario:usuarios(
+                id,
+                nombre_completo,
+                telefono,
+                foto_perfil,
+                ubicacion,
+                fecha_registro,
+                activo
+            ),
+            categorias:especialidades(
+                categoria:categorias(*)
+            )
+        """)
 
         if disponible is not None:
             query = query.eq("disponible", disponible)
