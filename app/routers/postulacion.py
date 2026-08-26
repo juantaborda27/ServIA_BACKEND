@@ -40,6 +40,7 @@ def list_postulaciones(
     estado: Optional[EstadoPostulacion] = None,
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
+    incluir_prestador: bool = Query(False)
 ):
 
     return postulacion_service.list_postulaciones(
@@ -47,6 +48,7 @@ def list_postulaciones(
         estado=estado.value if estado else None,
         limit=limit,
         offset=offset,
+        incluir_prestador=incluir_prestador
     )
 
 
