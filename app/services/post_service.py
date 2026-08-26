@@ -50,20 +50,22 @@ class PublicacionService:
         estado: Optional[str] = None,
         prestador_id: Optional[str] = None,
         categoria_id: Optional[str] = None,
-        incluir_usuario: Optional[bool] = False,
         usuario_id: Optional[str] = None,
         limit: int = 20,
         offset: int = 0,
+        incluir_usuario: bool = False,
+        incluir_categoria: bool = False,
     ):
 
         return self.repository.list(
             estado=estado,
             prestador_id=prestador_id,
-            incluir_usuario=incluir_usuario,
             categoria_id=categoria_id,
             usuario_id=usuario_id,
             limit=limit,
             offset=offset,
+            incluir_usuario=incluir_usuario,
+            incluir_categoria=incluir_categoria,
         )
 
     def update_publicacion(
@@ -113,5 +115,6 @@ class PublicacionService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permiso sobre esta publicación"
             )
+
     def get_publicaciones_by_usuario(self, usuario_id: str):
         return self.repository.list(usuario_id=usuario_id)

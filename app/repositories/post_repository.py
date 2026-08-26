@@ -21,7 +21,11 @@ class PublicacionRepository:
         response = (
             supabase
             .table("publicaciones")
-            .select("*")
+            .select(
+                "*, "
+                "usuario:usuarios(nombre_completo, telefono, foto_perfil), "
+                "categoria:categorias(nombre, icono)"
+            )
             .eq("id", publicacion_id)
             .single()
             .execute()
@@ -35,14 +39,20 @@ class PublicacionRepository:
         estado: Optional[str] = None,
         categoria_id: Optional[str] = None,
         usuario_id: Optional[str] = None,
-        incluir_usuario: bool = False,
         limit: int = 20,
         offset: int = 0,
+        incluir_usuario: bool = False,
+        incluir_categoria: bool = False,
     ):
-        campos = "*"
+
+        campos = ["*"]
         if incluir_usuario:
-            campos = "*, usuario:usuarios(nombre_completo, telefono, foto_perfil)"
-        query = supabase.table("publicaciones").select(campos)
+            campos.append("usuario:usuarios(nombre_completo, foto_perfil)")
+        if incluir_categoria:
+            campos.append("categoria:categorias(nombre, icono)")
+
+        query = supabase.table("publicaciones").select(", ".join(campos))
+
         if prestador_id:
             # 1. Traemos las categorías del prestador
             especialidades = (
@@ -74,6 +84,7 @@ class PublicacionRepository:
             .range(offset, offset + limit - 1)
             .execute()
         )
+
         return response.data
 
     def update(self, publicacion_id: str, data: dict):
