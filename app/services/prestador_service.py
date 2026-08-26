@@ -53,7 +53,7 @@ class PrestadorService:
         offset: int = 0,
     ):
 
-        prestadores = self.repository.list(
+        prestadores = self.repository.list_all(
             disponible=disponible,
             verificado=verificado,
             categoria_id=categoria_id,
