@@ -50,6 +50,7 @@ class PublicacionService:
         estado: Optional[str] = None,
         prestador_id: Optional[str] = None,
         categoria_id: Optional[str] = None,
+        incluir_usuario: Optional[bool] = False,
         usuario_id: Optional[str] = None,
         limit: int = 20,
         offset: int = 0,
@@ -58,6 +59,7 @@ class PublicacionService:
         return self.repository.list(
             estado=estado,
             prestador_id=prestador_id,
+            incluir_usuario=incluir_usuario,
             categoria_id=categoria_id,
             usuario_id=usuario_id,
             limit=limit,
