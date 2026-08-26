@@ -35,12 +35,14 @@ class PublicacionRepository:
         estado: Optional[str] = None,
         categoria_id: Optional[str] = None,
         usuario_id: Optional[str] = None,
+        incluir_usuario: bool = False,
         limit: int = 20,
         offset: int = 0,
     ):
-
-        query = supabase.table("publicaciones").select("*")
-
+        campos = "*"
+        if incluir_usuario:
+            campos = "*, usuario:usuarios(nombre_completo, telefono, foto_perfil)"
+        query = supabase.table("publicaciones").select(campos)
         if prestador_id:
             # 1. Traemos las categorías del prestador
             especialidades = (
@@ -72,10 +74,6 @@ class PublicacionRepository:
             .range(offset, offset + limit - 1)
             .execute()
         )
-        print("DEBUG categoria_ids:", categoria_ids)
-        print("DEBUG cantidad publicaciones encontradas:", len(response.data))
-        print("DEBUG respuesta cruda:", response.data)
-
         return response.data
 
     def update(self, publicacion_id: str, data: dict):
