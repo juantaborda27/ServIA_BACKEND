@@ -1,43 +1,36 @@
-from app.core.supabase import supabase
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.usuario import Usuario
 
 
 class UsuarioRepository:
 
-    def get_by_id(self, user_id: str):
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-        response = (
-            supabase
-            .table("usuarios")
-            .select("*")
-            .eq("id", user_id)
-            .single()
-            .execute()
-        )
+    async def get_by_id(self, user_id: str) -> Optional[Usuario]:
+        stmt = select(Usuario).where(Usuario.id == user_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
-        return response.data
+    async def update(self, user_id: str, data: dict) -> Optional[Usuario]:
+        stmt = select(Usuario).where(Usuario.id == user_id)
+        result = await self.db.execute(stmt)
+        usuario = result.scalar_one_or_none()
 
-    def update(self, user_id: str, data: dict):
+        if not usuario:
+            return None
 
-        response = (
-            supabase
-            .table("usuarios")
-            .update(data)
-            .eq("id", user_id)
-            .execute()
-        )
+        for key, value in data.items():
+            setattr(usuario, key, value)
 
-        return response.data
+        await self.db.commit()
+        await self.db.refresh(usuario)
+        return usuario
 
-    def delete(self, user_id: str):
-
-        response = (
-            supabase
-            .table("usuarios")
-            .update({
-                "activo": False
-            })
-            .eq("id", user_id)
-            .execute()
-        )
-
-        return response.data
+    async def delete(self, user_id: str) -> Optional[Usuario]:
+        """Soft delete: marca al usuario como inactivo en vez de borrar el registro."""
+        return await self.update(user_id, {"activo": False})

@@ -13,14 +13,14 @@ from app.schemas.postulacion import (
 
 class PostulacionService:
 
-    def __init__(self):
+    def __init__(self,repository: PostulacionRepository, publicacion_repository: PublicacionRepository):
 
-        self.repository = PostulacionRepository()
-        self.publicacion_repository = PublicacionRepository()
+        self.repository = repository
+        self.publicacion_repository = publicacion_repository
 
-    def create_postulacion(self, data: PostulacionCreate, prestador_id: str):
+    async def create_postulacion(self, data: PostulacionCreate, prestador_id: str):
 
-        activa = self.repository.get_activa(data.publicacion_id, prestador_id)
+        activa = await self.repository.get_activa(data.publicacion_id, prestador_id)
 
         if activa:
 
@@ -43,9 +43,9 @@ class PostulacionService:
 
         return postulacion
 
-    def get_postulacion(self, postulacion_id: str):
+    async def get_postulacion(self, postulacion_id: str):
 
-        postulacion = self.repository.get_by_id(postulacion_id)
+        postulacion = await self.repository.get_by_id(postulacion_id)
 
         if not postulacion:
 
@@ -56,7 +56,7 @@ class PostulacionService:
 
         return postulacion
 
-    def list_postulaciones(
+    async def list_postulaciones(
         self,
         publicacion_id: Optional[str] = None,
         prestador_id: Optional[str] = None,
@@ -66,7 +66,7 @@ class PostulacionService:
         incluir_prestador: bool = False,
     ):
 
-        return self.repository.list(
+        return await self.repository.list_all(
             publicacion_id=publicacion_id,
             prestador_id=prestador_id,
             estado=estado,
@@ -75,48 +75,48 @@ class PostulacionService:
             incluir_prestador=incluir_prestador,
         )
 
-    def update_postulacion(
+    async def update_postulacion(
         self,
         postulacion_id: str,
         data: PostulacionUpdate,
         prestador_id: str,
     ):
 
-        postulacion = self.get_postulacion(postulacion_id)
-        self._verificar_dueno_postulacion(postulacion, prestador_id)
+        postulacion = await self.get_postulacion(postulacion_id)
+        await self._verificar_dueno_postulacion(postulacion, prestador_id)
 
         update_data = data.model_dump(exclude_unset=True, mode="json")
 
-        return self.repository.update(postulacion_id, update_data)
+        return await self.repository.update(postulacion_id, update_data)
 
-    def cambiar_estado(
+    async def cambiar_estado(
         self,
         postulacion_id: str,
         nuevo_estado: EstadoPostulacion,
         user_id: str,
     ):
 
-        postulacion = self.get_postulacion(postulacion_id)
-        self._verificar_dueno_publicacion(postulacion, user_id)
+        postulacion = await self.get_postulacion(postulacion_id)
+        await self._verificar_dueno_publicacion(postulacion, user_id)
 
-        actualizada = self.repository.update(
+        actualizada = await self.repository.update(
             postulacion_id,
             {"estado": nuevo_estado.value}
         )
 
         if nuevo_estado == EstadoPostulacion.aceptada:
-            self.repository.poner_en_espera_otras(
+            await self.repository.poner_en_espera_otras(
                 postulacion["publicacion_id"],
                 postulacion_id,
             )
 
         return actualizada
 
-    def revertir_aceptacion(self, postulacion_id: str, user_id: str):
+    async def revertir_aceptacion(self, postulacion_id: str, user_id: str):
         """Si el cliente se arrepiente, vuelve la postulación aceptada a pendiente."""
 
-        postulacion = self.get_postulacion(postulacion_id)
-        self._verificar_dueno_publicacion(postulacion, user_id)
+        postulacion = await self.get_postulacion(postulacion_id)
+        await self._verificar_dueno_publicacion(postulacion, user_id)
 
         if postulacion["estado"] != "aceptada":
             raise HTTPException(
@@ -124,13 +124,13 @@ class PostulacionService:
                 detail="Solo se puede revertir una postulación aceptada"
             )
 
-        return self.repository.update(postulacion_id, {"estado": "pendiente"})
+        return await self.repository.update(postulacion_id, {"estado": "pendiente"})
 
-    def delete_postulacion(self, postulacion_id: str, prestador_id: str):
+    async def delete_postulacion(self, postulacion_id: str, prestador_id: str):
 
-        postulacion = self.get_postulacion(postulacion_id)
-        self._verificar_dueno_postulacion(postulacion, prestador_id)
+        postulacion = await self.get_postulacion(postulacion_id)
+        await self._verificar_dueno_postulacion(postulacion, prestador_id)
 
-        self.repository.delete(postulacion_id)
+        await self.repository.delete(postulacion_id)
 
         return {"message": "Postulación eliminada correctamente"}
