@@ -1,18 +1,51 @@
-from app.core.supabase import supabase
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.servicio import Servicio
+
 
 class ServicioRepository:
-    def create(self, data: dict):
-        response = supabase.table("servicios").insert(data).execute()
-        return response.data[0] if response.data else None
 
-    def get_by_id(self, servicio_id: str):
-        response = supabase.table("servicios").select("*").eq("id", servicio_id).single().execute()
-        return response.data
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-    def update(self, servicio_id: str, data: dict):
-        response = supabase.table("servicios").update(data).eq("id", servicio_id).execute()
-        return response.data[0] if response.data else None
+    async def create(self, data: dict) -> Servicio:
+        servicio = Servicio(**data)
+        self.db.add(servicio)
+        await self.db.commit()
+        await self.db.refresh(servicio)
+        return servicio
 
-    def delete(self, servicio_id: str):
-        response = supabase.table("servicios").delete().eq("id", servicio_id).execute()
-        return response.data
+    async def get_by_id(self, servicio_id: str) -> Optional[Servicio]:
+        stmt = select(Servicio).where(Servicio.id == servicio_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update(self, servicio_id: str, data: dict) -> Optional[Servicio]:
+        stmt = select(Servicio).where(Servicio.id == servicio_id)
+        result = await self.db.execute(stmt)
+        servicio = result.scalar_one_or_none()
+
+        if not servicio:
+            return None
+
+        for key, value in data.items():
+            setattr(servicio, key, value)
+
+        await self.db.commit()
+        await self.db.refresh(servicio)
+        return servicio
+
+    async def delete(self, servicio_id: str) -> Optional[Servicio]:
+        stmt = select(Servicio).where(Servicio.id == servicio_id)
+        result = await self.db.execute(stmt)
+        servicio = result.scalar_one_or_none()
+
+        if not servicio:
+            return None
+
+        await self.db.delete(servicio)
+        await self.db.commit()
+        return servicio

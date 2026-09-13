@@ -1,39 +1,38 @@
 from typing import Optional
 
-from app.core.supabase import supabase
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.especialidad import Especialidad
+from app.models.publicacion import Publicacion
 
 
 class PublicacionRepository:
 
-    def create(self, data: dict):
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-        response = (
-            supabase
-            .table("publicaciones")
-            .insert(data)
-            .execute()
-        )
+    async def create(self, data: dict) -> Publicacion:
+        publicacion = Publicacion(**data)
+        self.db.add(publicacion)
+        await self.db.commit()
+        await self.db.refresh(publicacion)
+        return publicacion
 
-        return response.data[0] if response.data else None
-
-    def get_by_id(self, publicacion_id: str):
-
-        response = (
-            supabase
-            .table("publicaciones")
-            .select(
-                "*, "
-                "usuario:usuarios(nombre_completo, telefono, foto_perfil), "
-                "categoria:categorias(nombre, icono)"
+    async def get_by_id(self, publicacion_id: str) -> Optional[Publicacion]:
+        stmt = (
+            select(Publicacion)
+            .options(
+                selectinload(Publicacion.usuario),
+                selectinload(Publicacion.categoria),
             )
-            .eq("id", publicacion_id)
-            .single()
-            .execute()
+            .where(Publicacion.id == publicacion_id)
         )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
-        return response.data
-
-    def list(
+    async def list_all(
         self,
         prestador_id: Optional[str] = None,
         estado: Optional[str] = None,
@@ -43,70 +42,73 @@ class PublicacionRepository:
         offset: int = 0,
         incluir_usuario: bool = False,
         incluir_categoria: bool = False,
-    ):
+    ) -> list[Publicacion]:
 
-        campos = ["*"]
+        stmt = select(Publicacion)
+
+        options = []
         if incluir_usuario:
-            campos.append("usuario:usuarios(nombre_completo, foto_perfil)")
+            options.append(selectinload(Publicacion.usuario))
         if incluir_categoria:
-            campos.append("categoria:categorias(nombre, icono)")
-
-        query = supabase.table("publicaciones").select(", ".join(campos))
+            options.append(selectinload(Publicacion.categoria))
+        if options:
+            stmt = stmt.options(*options)
 
         if prestador_id:
-            # 1. Traemos las categorías del prestador
-            especialidades = (
-                supabase.table("especialidades")
-                .select("categoria_id")
-                .eq("prestador_id", prestador_id)
-                .execute()
+            # 1. Categorías en las que el prestador tiene especialidad
+            especialidades_stmt = select(Especialidad.categoria_id).where(
+                Especialidad.prestador_id == prestador_id
             )
-            categoria_ids = [row["categoria_id"] for row in especialidades.data]
+            result = await self.db.execute(especialidades_stmt)
+            categoria_ids = [row[0] for row in result.all()]
 
             if not categoria_ids:
                 return []  # sin especialidades declaradas -> no ve nada
 
             # 2. Filtramos publicaciones solo dentro de esas categorías
-            query = query.in_("categoria_id", categoria_ids)
+            stmt = stmt.where(Publicacion.categoria_id.in_(categoria_ids))
 
         if estado:
-            query = query.eq("estado", estado)
+            stmt = stmt.where(Publicacion.estado == estado)
 
         if categoria_id:
-            query = query.eq("categoria_id", categoria_id)
+            stmt = stmt.where(Publicacion.categoria_id == categoria_id)
 
         if usuario_id:
-            query = query.eq("usuario_id", usuario_id)
+            stmt = stmt.where(Publicacion.usuario_id == usuario_id)
 
-        response = (
-            query
-            .order("created_at", desc=True)
-            .range(offset, offset + limit - 1)
-            .execute()
+        stmt = (
+            stmt.order_by(Publicacion.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
 
-        return response.data
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
-    def update(self, publicacion_id: str, data: dict):
+    async def update(self, publicacion_id: str, data: dict) -> Optional[Publicacion]:
+        stmt = select(Publicacion).where(Publicacion.id == publicacion_id)
+        result = await self.db.execute(stmt)
+        publicacion = result.scalar_one_or_none()
 
-        response = (
-            supabase
-            .table("publicaciones")
-            .update(data)
-            .eq("id", publicacion_id)
-            .execute()
-        )
+        if not publicacion:
+            return None
 
-        return response.data[0] if response.data else None
+        for key, value in data.items():
+            setattr(publicacion, key, value)
 
-    def delete(self, publicacion_id: str):
+        await self.db.commit()
+        await self.db.refresh(publicacion)
+        return publicacion
 
-        response = (
-            supabase
-            .table("publicaciones")
-            .delete()
-            .eq("id", publicacion_id)
-            .execute()
-        )
+    async def delete(self, publicacion_id: str) -> Optional[Publicacion]:
+        stmt = select(Publicacion).where(Publicacion.id == publicacion_id)
+        result = await self.db.execute(stmt)
+        publicacion = result.scalar_one_or_none()
 
-        return response.data[0] if response.data else None
+        if not publicacion:
+            return None
+
+        await self.db.delete(publicacion)
+        await self.db.commit()
+        return publicacion

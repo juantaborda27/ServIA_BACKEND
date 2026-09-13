@@ -1,39 +1,42 @@
 from typing import Optional
 
-from app.core.supabase import supabase
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.postulacion import Postulacion
+from app.models.prestador import Prestador
 
 
 class PostulacionRepository:
 
-    def create(self, data: dict):
-        data["estado"] = "pendiente"  
-        response = (
-            supabase
-            .table("postulaciones")
-            .insert(data)
-            .execute()
-        )
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-        return response.data[0] if response.data else None
+    async def create(self, data: dict) -> Postulacion:
+        data["estado"] = "pendiente"
+        postulacion = Postulacion(**data)
+        self.db.add(postulacion)
+        await self.db.commit()
+        await self.db.refresh(postulacion)
+        return postulacion
 
-    def get_by_id(self, postulacion_id: str):
-
-        response = (
-            supabase
-            .table("postulaciones")
-            .select(
-                "*, "
-                "prestador:usuarios(nombre_completo, telefono, foto_perfil), "
-                "publicacion:publicaciones(usuario_id, estado)"
+    async def get_by_id(self, postulacion_id: str) -> Optional[Postulacion]:
+        stmt = (
+            select(Postulacion)
+            .options(
+                # nombre_completo/telefono/foto_perfil viven en usuarios,
+                # por eso bajamos un nivel más: prestador -> usuario
+                selectinload(Postulacion.prestador).selectinload(Prestador.usuario),
+                selectinload(Postulacion.publicacion),
             )
-            .eq("id", postulacion_id)
-            .single()
-            .execute()
+            .where(Postulacion.id == postulacion_id)
         )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
-        return response.data
-
-    def list(
+    async def list_all(
         self,
         publicacion_id: Optional[str] = None,
         prestador_id: Optional[str] = None,
@@ -41,83 +44,90 @@ class PostulacionRepository:
         limit: int = 20,
         offset: int = 0,
         incluir_prestador: bool = False,
-    ):
+    ) -> list[Postulacion]:
 
-        campos = ["*"]
+        stmt = select(Postulacion)
+
         if incluir_prestador:
-            campos.append("prestador:usuarios(nombre_completo, foto_perfil)")
-
-        query = supabase.table("postulaciones").select(", ".join(campos))
+            stmt = stmt.options(
+                selectinload(Postulacion.prestador).selectinload(Prestador.usuario)
+            )
 
         if publicacion_id:
-            query = query.eq("publicacion_id", publicacion_id)
+            stmt = stmt.where(Postulacion.publicacion_id == publicacion_id)
 
         if prestador_id:
-            query = query.eq("prestador_id", prestador_id)
+            stmt = stmt.where(Postulacion.prestador_id == prestador_id)
 
         if estado:
-            query = query.eq("estado", estado)
+            stmt = stmt.where(Postulacion.estado == estado)
 
-        response = (
-            query
-            .order("created_at", desc=True)
-            .range(offset, offset + limit - 1)
-            .execute()
+        stmt = (
+            stmt.order_by(Postulacion.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
 
-        return response.data
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
-    def get_activa(self, publicacion_id: str, prestador_id: str):
-        """Busca si el prestador ya tiene una postulación activa (pendiente/en_espera) para esta publicación."""
+    async def get_activa(
+        self, publicacion_id: str, prestador_id: str
+    ) -> Optional[Postulacion]:
+        """Busca si el prestador ya tiene una postulación activa
+        (pendiente/en_espera) para esta publicación."""
 
-        response = (
-            supabase
-            .table("postulaciones")
-            .select("id, estado")
-            .eq("publicacion_id", publicacion_id)
-            .eq("prestador_id", prestador_id)
-            .in_("estado", ["pendiente", "en_espera"])
-            .execute()
+        stmt = (
+            select(Postulacion)
+            .where(Postulacion.publicacion_id == publicacion_id)
+            .where(Postulacion.prestador_id == prestador_id)
+            .where(Postulacion.estado.in_(["pendiente", "en_espera"]))
         )
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
 
-        return response.data[0] if response.data else None
+    async def update(self, postulacion_id: str, data: dict) -> Optional[Postulacion]:
+        stmt = select(Postulacion).where(Postulacion.id == postulacion_id)
+        result = await self.db.execute(stmt)
+        postulacion = result.scalar_one_or_none()
 
-    def update(self, postulacion_id: str, data: dict):
+        if not postulacion:
+            return None
 
-        response = (
-            supabase
-            .table("postulaciones")
-            .update(data)
-            .eq("id", postulacion_id)
-            .execute()
+        for key, value in data.items():
+            setattr(postulacion, key, value)
+
+        await self.db.commit()
+        await self.db.refresh(postulacion)
+        return postulacion
+
+    async def poner_en_espera_otras(
+        self, publicacion_id: str, postulacion_id_aceptada: str
+    ) -> list[Postulacion]:
+        """Al aceptar una oferta, las demás pendientes quedan en espera
+        (no rechazadas), por si el cliente se arrepiente y quiere volver
+        a considerarlas."""
+
+        stmt = (
+            sa_update(Postulacion)
+            .where(Postulacion.publicacion_id == publicacion_id)
+            .where(Postulacion.id != postulacion_id_aceptada)
+            .where(Postulacion.estado == "pendiente")
+            .values(estado="en_espera")
+            .returning(Postulacion)
         )
+        result = await self.db.execute(stmt)
+        await self.db.commit()
+        return list(result.scalars().all())
 
-        return response.data[0] if response.data else None
+    async def delete(self, postulacion_id: str) -> Optional[Postulacion]:
+        stmt = select(Postulacion).where(Postulacion.id == postulacion_id)
+        result = await self.db.execute(stmt)
+        postulacion = result.scalar_one_or_none()
 
-    def poner_en_espera_otras(self, publicacion_id: str, postulacion_id_aceptada: str):
-        """Al aceptar una oferta, las demás pendientes quedan en espera (no rechazadas),
-        por si el cliente se arrepiente y quiere volver a considerarlas."""
+        if not postulacion:
+            return None
 
-        response = (
-            supabase
-            .table("postulaciones")
-            .update({"estado": "en_espera"})
-            .eq("publicacion_id", publicacion_id)
-            .neq("id", postulacion_id_aceptada)
-            .eq("estado", "pendiente")
-            .execute()
-        )
-
-        return response.data
-
-    def delete(self, postulacion_id: str):
-
-        response = (
-            supabase
-            .table("postulaciones")
-            .delete()
-            .eq("id", postulacion_id)
-            .execute()
-        )
-
-        return response.data[0] if response.data else None
+        await self.db.delete(postulacion)
+        await self.db.commit()
+        return postulacion

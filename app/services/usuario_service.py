@@ -6,13 +6,13 @@ from app.schemas.usuario import UsuarioCreate
 
 class UsuarioService:
 
-    def __init__(self):
+    def __init__(self,repository: UsuarioRepository):
 
-        self.repository = UsuarioRepository()
+        self.repository = repository
 
-    def get_profile(self, user_id: str):
+    async def get_profile(self, user_id: str):
 
-        usuario = self.repository.get_by_id(user_id)
+        usuario = await self.repository.get_by_id(user_id)
 
         if not usuario:
 
@@ -23,7 +23,7 @@ class UsuarioService:
 
         return usuario
 
-    def update_profile(
+    async def update_profile(
         self,
         user_id: str,
         data: UsuarioCreate
@@ -33,16 +33,16 @@ class UsuarioService:
             exclude_unset=True
         )
 
-        usuario = self.repository.update(
+        usuario = await self.repository.update(
             user_id,
             update_data
         )
 
         return usuario
 
-    def deactivate_account(self, user_id: str):
+    async def deactivate_account(self, user_id: str):
 
-        self.repository.delete(user_id)
+        await self.repository.delete(user_id)
 
         return {
             "message": "Cuenta desactivada correctamente"

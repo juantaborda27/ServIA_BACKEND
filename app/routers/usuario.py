@@ -5,43 +5,44 @@ from app.dependencies.auth import get_current_user
 from app.services.usuario_service import UsuarioService
 
 from app.schemas.usuario import UsuarioCreate
-
+from app.services.dependencies import get_usuario_service
 
 router = APIRouter(
     prefix="/usuarios",
     tags=["Usuarios"]
 )
 
-usuario_service = UsuarioService()
-
 
 @router.get("/me")
-def get_my_profile(
-    current_user=Depends(get_current_user)
+async def get_my_profile(
+    current_user=Depends(get_current_user),
+    services: UsuarioService = Depends(get_usuario_service)
 ):
 
-    return usuario_service.get_profile(
+    return await services.get_profile(
         current_user.id
     )
 
 
 @router.put("/me")
-def update_my_profile(
+async def update_my_profile(
     data: UsuarioCreate,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: UsuarioService = Depends(get_usuario_service)
 ):
 
-    return usuario_service.update_profile(
+    return await services.update_profile(
         current_user.id,
         data
     )
 
 
 @router.delete("/me")
-def deactivate_my_account(
-    current_user=Depends(get_current_user)
+async def deactivate_my_account(
+    current_user=Depends(get_current_user),
+    services: UsuarioService = Depends(get_usuario_service)
 ):
 
-    return usuario_service.deactivate_account(
+    return await services.deactivate_account(
         current_user.id
     )
