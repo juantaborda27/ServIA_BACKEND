@@ -1,36 +1,32 @@
-from app.core.supabase import supabase
-from app.schemas.auth import RegisterRequest, LoginRequest, RefreshRequest
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.models.usuario import Usuario  # ajusta el path real a tu modelo
+from app.schemas.auth import RegisterRequest
+from app.core.security import hash_password
 
 
 class AuthRepository:
 
-    def register_user(self, data: RegisterRequest):
-        return supabase.auth.sign_up({
-            "email": data.email,
-            "password": data.password,
-            "options": {
-                "data": {
-                    "nombre_completo": data.nombre_completo,
-                    "telefono": data.telefono,
-                    "ubicacion": data.ubicacion
-                }
-            }
-        })
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-    def login_user(self, data: LoginRequest):
-        return supabase.auth.sign_in_with_password({
-            "email": data.email,
-            "password": data.password
-        })
+    async def get_by_email(self, email: str) -> Usuario | None:
+        result = await self.db.execute(select(Usuario).where(Usuario.email == email))
+        return result.scalar_one_or_none()
 
-    def refresh_session(self, data: RefreshRequest):
+    async def get_by_id(self, user_id: str) -> Usuario | None:
+        result = await self.db.execute(select(Usuario).where(Usuario.id == user_id))
+        return result.scalar_one_or_none()
 
-        return supabase.auth.refresh_session(
-            data.refresh_token
+    async def create_user(self, data: RegisterRequest) -> Usuario:
+        nuevo_usuario = Usuario(
+            email=data.email,
+            hashed_password=hash_password(data.password),
+            nombre_completo=data.nombre_completo,
+            telefono=data.telefono,
+            ubicacion=data.ubicacion,
         )
-
-    def logout_user(self, access_token: str):
-
-        return supabase.auth.admin.sign_out(
-            access_token
-        )
+        self.db.add(nuevo_usuario)
+        await self.db.commit()
+        await self.db.refresh(nuevo_usuario)
+        return nuevo_usuario

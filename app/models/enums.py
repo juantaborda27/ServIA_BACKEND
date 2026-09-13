@@ -17,9 +17,10 @@ EstadoPostulacionEnum = Enum(
 # ⚠️ ASUNCIÓN - verifica los valores reales con:
 # SELECT unnest(enum_range(NULL::nivel_urgencia));
 NivelUrgenciaEnum = Enum(
-    "baja",
-    "media",
-    "alta",
+    "ahora",
+    "hoy",
+    "esta semana",
+    "no tengo prisa",
     name="nivel_urgencia",
     create_type=False,
 )
@@ -28,9 +29,11 @@ NivelUrgenciaEnum = Enum(
 # SELECT unnest(enum_range(NULL::estado_publicacion));
 EstadoPublicacionEnum = Enum(
     "activo",
-    "en_proceso",
-    "finalizado",
+    "acuerdo",
+    "en_progreso",
+    "terminado",
     "cancelado",
+    "expirado",
     name="estado_publicacion",
     create_type=False,
 )
