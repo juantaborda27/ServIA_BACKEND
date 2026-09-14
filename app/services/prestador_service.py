@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import inspect
 
 from app.repositories.prestador_repository import PrestadorRepository
 from app.schemas.prestador import PrestadorCreate, PrestadorUpdate
@@ -8,8 +9,7 @@ from app.schemas.prestador import PrestadorCreate, PrestadorUpdate
 
 class PrestadorService:
 
-    def __init__(self,repository: PrestadorRepository):
-
+    def __init__(self, repository: PrestadorRepository):
         self.repository = repository
 
     async def create_prestador(self, data: PrestadorCreate, user_id: str):
@@ -20,7 +20,6 @@ class PrestadorService:
         prestador = await self.repository.create(payload)
 
         if not prestador:
-
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No se pudo crear el prestador"
@@ -36,7 +35,6 @@ class PrestadorService:
         prestador = await self.repository.get_by_id(prestador_id)
 
         if not prestador:
-
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Prestador no encontrado"
@@ -61,7 +59,7 @@ class PrestadorService:
             offset=offset,
         )
 
-        return [await self._flatten_categorias(p) for p in prestadores]
+        return [self._flatten_categorias(p) for p in prestadores]
 
     async def update_prestador(
         self,
@@ -97,32 +95,40 @@ class PrestadorService:
     @staticmethod
     async def _verificar_dueno(prestador: dict, user_id: str):
 
-        if prestador["id"] != user_id:
-
+        if str(prestador["id"]) != str(user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permiso sobre este prestador"
             )
 
     @staticmethod
-    def _flatten_categorias(prestador: dict) -> dict:
+    def _model_to_dict(obj) -> Optional[dict]:
+        if obj is None:
+            return None
+        return {c.key: getattr(obj, c.key) for c in inspect(obj).mapper.column_attrs}
 
-        # Sacar usuario
-        usuario = prestador.pop("usuario", None)
+    @classmethod
+    def _flatten_categorias(cls, prestador) -> dict:
 
+        data = cls._model_to_dict(prestador)
+
+        # Aplanar datos del usuario relacionado (antes: prestador.pop("usuario", None))
+        usuario = getattr(prestador, "usuario", None)
         if usuario:
-            prestador["nombre_completo"] = usuario.get("nombre_completo")
-            prestador["telefono"] = usuario.get("telefono")
-            prestador["foto_perfil"] = usuario.get("foto_perfil")
-            prestador["ubicacion"] = usuario.get("ubicacion")
-            prestador["fecha_registro"] = usuario.get("fecha_registro")
-            prestador["activo"] = usuario.get("activo")
+            data["nombre_completo"] = usuario.nombre_completo
+            data["telefono"] = usuario.telefono
+            data["foto_perfil"] = usuario.foto_perfil
+            data["ubicacion"] = usuario.ubicacion
+            data["fecha_registro"] = usuario.fecha_registro
+            data["activo"] = usuario.activo
 
-        # Aplanar categorías
-        raw = prestador.pop("categorias", []) or []
+        # Aplanar categorías a través de la relación especialidades -> categoria
+        # (antes: prestador.pop("categorias", []))
+        especialidades = getattr(prestador, "especialidades", []) or []
 
-        prestador["categorias"] = [
-            item["categoria"] for item in raw if item.get("categoria")
+        data["categorias"] = [
+            cls._model_to_dict(esp.categoria)
+            for esp in especialidades if getattr(esp, "categoria", None)
         ]
 
-        return prestador
+        return data
