@@ -37,6 +37,7 @@ async def create_postulacion(
 @router.get("")
 async def list_postulaciones(
     publicacion_id: Optional[str] = None,
+    current_user=Depends(get_current_user),
     estado: Optional[EstadoPostulacion] = None,
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
@@ -48,6 +49,7 @@ async def list_postulaciones(
         publicacion_id=publicacion_id,
         estado=estado.value if estado else None,
         limit=limit,
+        prestador_id=current_user.id,
         offset=offset,
         incluir_prestador=incluir_prestador
     )
@@ -116,3 +118,4 @@ async def delete_postulacion(
         postulacion_id,
         current_user.id
     )
+
