@@ -32,7 +32,7 @@ class PostulacionService:
         payload = data.model_dump(mode="json")
         payload["prestador_id"] = prestador_id
 
-        postulacion = self.repository.create(payload)
+        postulacion = await self.repository.create(payload)
 
         if not postulacion:
 
