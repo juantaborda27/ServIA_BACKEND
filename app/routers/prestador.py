@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from app.dependencies.auth import get_current_user
-
+from app.services.dependencies import get_prestador_service
 from app.services.prestador_service import PrestadorService
 
 from app.schemas.prestador import PrestadorCreate, PrestadorUpdate
@@ -14,31 +14,32 @@ router = APIRouter(
     tags=["Prestadores"]
 )
 
-prestador_service = PrestadorService()
 
 
 @router.post("")
-def create_prestador(
+async def create_prestador(
     data: PrestadorCreate,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service)
 ):
 
-    return prestador_service.create_prestador(
+    return await services.create_prestador(
         data,
         current_user.id
     )
 
 
 @router.get("")
-def list_prestadores(
+async def list_prestadores(
     disponible: Optional[bool] = None,
     verificado: Optional[bool] = None,
     categoria_id: Optional[str] = None,
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
+    services: PrestadorService = Depends(get_prestador_service)
 ):
 
-    return prestador_service.list_prestadores(
+    return await services.list_prestadores(
         disponible=disponible,
         verificado=verificado,
         categoria_id=categoria_id,
@@ -48,26 +49,31 @@ def list_prestadores(
 
 
 @router.get("/mi-perfil")
-def get_mi_perfil_prestador(
-    current_user=Depends(get_current_user)
+async def get_mi_perfil_prestador(
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service)
 ):
-    return prestador_service.get_prestador(current_user.id)
+    return await services.get_prestador(current_user.id)
 
 
 @router.get("/{prestador_id}")
-def get_prestador(prestador_id: str):
+async def get_prestador(
+    prestador_id: str,
+    services: PrestadorService = Depends(get_prestador_service)
+):
 
-    return prestador_service.get_prestador(prestador_id)
+    return await services.get_prestador(prestador_id)
 
 
 @router.put("/{prestador_id}")
-def update_prestador(
+async def update_prestador(
     prestador_id: str,
     data: PrestadorUpdate,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service)
 ):
 
-    return prestador_service.update_prestador(
+    return await services.update_prestador(
         prestador_id,
         data,
         current_user.id
@@ -75,12 +81,13 @@ def update_prestador(
 
 
 @router.delete("/{prestador_id}")
-def delete_prestador(
+async def delete_prestador(
     prestador_id: str,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service)
 ):
 
-    return prestador_service.delete_prestador(
+    return await services.delete_prestador(
         prestador_id,
         current_user.id
     )

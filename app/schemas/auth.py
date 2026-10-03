@@ -8,9 +8,17 @@ class RegisterRequest(BaseModel):
     telefono: str | None = None
     ubicacion: str | None = None
 
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    user_id: str

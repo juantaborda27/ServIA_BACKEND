@@ -12,16 +12,16 @@ from app.schemas.post import (
 
 class PublicacionService:
 
-    def __init__(self):
+    def __init__(self, repository: PublicacionRepository):
 
-        self.repository = PublicacionRepository()
+        self.repository = repository
 
-    def create_publicacion(self, data: PublicacionCreate, user_id: str):
+    async def create_publicacion(self, data: PublicacionCreate, user_id: str):
 
         payload = data.model_dump(mode="json")
         payload["usuario_id"] = user_id
 
-        publicacion = self.repository.create(payload)
+        publicacion = await self.repository.create(payload)
 
         if not publicacion:
 
@@ -32,9 +32,9 @@ class PublicacionService:
 
         return publicacion
 
-    def get_publicacion(self, publicacion_id: str):
+    async def get_publicacion(self, publicacion_id: str):
 
-        publicacion = self.repository.get_by_id(publicacion_id)
+        publicacion = await self.repository.get_by_id(publicacion_id)
 
         if not publicacion:
 
@@ -45,7 +45,7 @@ class PublicacionService:
 
         return publicacion
 
-    def list_publicaciones(
+    async def list_publicaciones(
         self,
         estado: Optional[str] = None,
         prestador_id: Optional[str] = None,
@@ -57,7 +57,7 @@ class PublicacionService:
         incluir_categoria: bool = False,
     ):
 
-        return self.repository.list(
+        return await self.repository.list_all(
             estado=estado,
             prestador_id=prestador_id,
             categoria_id=categoria_id,
@@ -68,46 +68,46 @@ class PublicacionService:
             incluir_categoria=incluir_categoria,
         )
 
-    def update_publicacion(
+    async def update_publicacion(
         self,
         publicacion_id: str,
         data: PublicacionUpdate,
         user_id: str,
     ):
 
-        publicacion = self.get_publicacion(publicacion_id)
-        self._verificar_dueno(publicacion, user_id)
+        publicacion = await self.get_publicacion(publicacion_id)
+        await self._verificar_dueno(publicacion, user_id)
 
         update_data = data.model_dump(exclude_unset=True, mode="json")
 
-        return self.repository.update(publicacion_id, update_data)
+        return await self.repository.update(publicacion_id, update_data)
 
-    def cambiar_estado(
+    async def cambiar_estado(
         self,
         publicacion_id: str,
         nuevo_estado: EstadoPublicacion,
         user_id: str,
     ):
 
-        publicacion = self.get_publicacion(publicacion_id)
-        self._verificar_dueno(publicacion, user_id)
+        publicacion = await self.get_publicacion(publicacion_id)
+        await self._verificar_dueno(publicacion, user_id)
 
-        return self.repository.update(
+        return await self.repository.update(
             publicacion_id,
             {"estado": nuevo_estado.value}
         )
 
-    def delete_publicacion(self, publicacion_id: str, user_id: str):
+    async def delete_publicacion(self, publicacion_id: str, user_id: str):
 
-        publicacion = self.get_publicacion(publicacion_id)
-        self._verificar_dueno(publicacion, user_id)
+        publicacion = await self.get_publicacion(publicacion_id)
+        await self._verificar_dueno(publicacion, user_id)
 
-        self.repository.delete(publicacion_id)
+        await self.repository.delete(publicacion_id)
 
         return {"message": "Publicación eliminada correctamente"}
 
     @staticmethod
-    def _verificar_dueno(publicacion: dict, user_id: str):
+    async def _verificar_dueno(publicacion: dict, user_id: str):
 
         if publicacion["usuario_id"] != user_id:
 
@@ -116,5 +116,5 @@ class PublicacionService:
                 detail="No tienes permiso sobre esta publicación"
             )
 
-    def get_publicaciones_by_usuario(self, usuario_id: str):
-        return self.repository.list(usuario_id=usuario_id)
+    async def get_publicaciones_by_usuario(self, usuario_id: str):
+        return await self.repository.list_all(usuario_id=usuario_id)

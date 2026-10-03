@@ -1,34 +1,40 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
-from app.core.supabase import supabase
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import decode_token
+from app.core.database import get_db
+from app.repositories.auth_repository import AuthRepository
 
 security = HTTPBearer()
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
 ):
     token = credentials.credentials
 
     try:
-        response = supabase.auth.get_user(token)
-
-        if not response.user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Usuario no autenticado"
-            )
-
-        return response.user
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        print("ERROR VALIDANDO TOKEN:", e)
-
+        payload = decode_token(token)
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado"
         )
+
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token no es de tipo access"
+        )
+
+    repository = AuthRepository(db)
+    usuario = await repository.get_by_id(payload["sub"])
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario no encontrado"
+        )
+
+    return usuario
