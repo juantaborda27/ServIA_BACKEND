@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from app.dependencies.auth import get_current_user
-
+from app.services.dependencies import get_postulacion_service
 from app.services.postulacion_service import PostulacionService
 
 from app.schemas.postulacion import (
@@ -19,53 +19,60 @@ router = APIRouter(
     tags=["Postulaciones"]
 )
 
-postulacion_service = PostulacionService()
 
 
 @router.post("")
-def create_postulacion(
+async def create_postulacion(
     data: PostulacionCreate,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PostulacionService = Depends(get_postulacion_service)
 ):
 
-    return postulacion_service.create_postulacion(
+    return await services.create_postulacion(
         data,
         current_user.id
     )
 
 
 @router.get("")
-def list_postulaciones(
+async def list_postulaciones(
     publicacion_id: Optional[str] = None,
+    current_user=Depends(get_current_user),
     estado: Optional[EstadoPostulacion] = None,
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
-    incluir_prestador: bool = Query(False)
+    incluir_prestador: bool = Query(False),
+    services: PostulacionService = Depends(get_postulacion_service)
 ):
 
-    return postulacion_service.list_postulaciones(
+    return await services.list_postulaciones(
         publicacion_id=publicacion_id,
         estado=estado.value if estado else None,
         limit=limit,
+        prestador_id=current_user.id,
         offset=offset,
         incluir_prestador=incluir_prestador
     )
 
 
 @router.get("/{postulacion_id}")
-def get_postulacion(postulacion_id: str):
+async def get_postulacion(
+    postulacion_id: str,
+    services: PostulacionService = Depends(get_postulacion_service)
+):
 
-    return postulacion_service.get_postulacion(postulacion_id)
+    return await services.get_postulacion(postulacion_id)
 
 
 @router.put("/{postulacion_id}")
-def update_postulacion(
+async def update_postulacion(
     postulacion_id: str,
     data: PostulacionUpdate,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PostulacionService = Depends(get_postulacion_service)
 ):
 
-    return postulacion_service.update_postulacion(
+    return await services.update_postulacion(
         postulacion_id,
         data,
         current_user.id
@@ -73,13 +80,14 @@ def update_postulacion(
 
 
 @router.patch("/{postulacion_id}/estado")
-def cambiar_estado_postulacion(
+async def cambiar_estado_postulacion(
     postulacion_id: str,
     data: PostulacionEstadoUpdate,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PostulacionService = Depends(get_postulacion_service)
 ):
 
-    return postulacion_service.cambiar_estado(
+    return await services.cambiar_estado(
         postulacion_id,
         data.estado,
         current_user.id
@@ -87,24 +95,27 @@ def cambiar_estado_postulacion(
 
 
 @router.post("/{postulacion_id}/revertir")
-def revertir_aceptacion_postulacion(
+async def revertir_aceptacion_postulacion(
     postulacion_id: str,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PostulacionService = Depends(get_postulacion_service) 
 ):
 
-    return postulacion_service.revertir_aceptacion(
+    return await services.revertir_aceptacion(
         postulacion_id,
         current_user.id
     )
 
 
 @router.delete("/{postulacion_id}")
-def delete_postulacion(
+async def delete_postulacion(
     postulacion_id: str,
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    services: PostulacionService = Depends(get_postulacion_service)
 ):
 
-    return postulacion_service.delete_postulacion(
+    return await services.delete_postulacion(
         postulacion_id,
         current_user.id
     )
+
