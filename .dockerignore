@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.local
+.git/
+.gitignore
+*.ps1
+*.pem
+*.log
+task_*.json
+policy_*.json
+credentials.ps1
+

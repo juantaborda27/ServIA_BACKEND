@@ -3,16 +3,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:PasswordSegura123@localhost:5432/servia_db")
+# Asegurar compatibilidad con driver asíncrono asyncpg si viene en formato postgresql://
+if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "_Av13cu#7-LfUNXa+xMUz6Y")
+
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL no está configurada")
-if not SUPABASE_URL:
-    raise ValueError("SUPABASE_URL no está configurada")
-if not SUPABASE_KEY:
-    raise ValueError("SUPABASE_KEY no está configurada")
 if not JWT_SECRET_KEY:
     raise ValueError("JWT_SECRET_KEY no está configurada")

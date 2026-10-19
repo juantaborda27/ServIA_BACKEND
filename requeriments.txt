@@ -1,5 +1,8 @@
 fastapi
 uvicorn
-supabase
 python-dotenv
 email-validator
+SQLAlchemy
+asyncpg
+bcrypt
+PyJWT
