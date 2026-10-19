@@ -6,6 +6,8 @@ from app.models.prestador import Prestador
 from app.models.publicacion import Publicacion
 from app.models.servicio import Servicio
 from app.models.usuario import Usuario
+from app.models.conversacion import Conversacion
+from app.models.mensaje import Mensaje
 
 __all__ = [
     "Categoria",
@@ -16,4 +18,6 @@ __all__ = [
     "Publicacion",
     "Servicio",
     "Usuario",
+    "Conversacion",
+    "Mensaje",
 ]

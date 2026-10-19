@@ -63,3 +63,7 @@ class Postulacion(Base):
 
     publicacion: Mapped["Publicacion"] = relationship(back_populates="postulaciones")
     prestador: Mapped["Prestador"] = relationship(back_populates="postulaciones")
+    conversacion: Mapped["Conversacion | None"] = relationship(
+    back_populates="postulacion",
+    uselist=False,
+    )
