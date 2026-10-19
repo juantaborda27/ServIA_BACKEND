@@ -1,3 +1,35 @@
+# =============================================
+# Entornos virtuales Python
+# =============================================
 /venv/
-__pycache__/
 .venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# =============================================
+# CREDENCIALES Y SECRETOS - NUNCA SUBIR A GIT
+# =============================================
+credentials.ps1
+*.pem
+.env
+*.env.local
+*.env.production
+
+# =============================================
+# Archivos de despliegue temporales
+# =============================================
+backend_bundle.zip
+lt_data.json
+asg_policy.json
+bucket_policy_front.json
+cf_config.json
+servia_ec2_key.pem
+
+# =============================================
+# IDEs y sistema operativo
+# =============================================
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
