@@ -703,12 +703,21 @@ if (Test-Path $FrontendDir) {
     Write-Host "Instalando dependencias de Node.js..." -ForegroundColor Cyan
     npm install --no-audit --no-fund
 
+    # 1. Configurar la URL actual del ALB en archivos .env locales para Expo
+    Set-Content -Path ".env" -Value "EXPO_PUBLIC_API_URL=http://$AlbDns" -Encoding ascii
+    Set-Content -Path ".env.local" -Value "EXPO_PUBLIC_API_URL=http://$AlbDns" -Encoding ascii
     $env:EXPO_PUBLIC_API_URL = "http://$AlbDns"
+
+    # 2. Limpiar cache previo para forzar a que Expo hornee la URL correcta
+    if (Test-Path "dist") { Remove-Item "dist" -Recurse -Force -ErrorAction SilentlyContinue }
+    if (Test-Path ".expo") { Remove-Item ".expo" -Recurse -Force -ErrorAction SilentlyContinue }
+
     Write-Host "Compilando Frontend apuntando al Backend ($env:EXPO_PUBLIC_API_URL)..." -ForegroundColor Cyan
-    npx expo export -p web
+    npx expo export -p web --clear
     $BuildOk = ($LASTEXITCODE -eq 0)
     Remove-Item Env:EXPO_PUBLIC_API_URL -ErrorAction SilentlyContinue
     Pop-Location
+
 
     if ($BuildOk -and (Test-Path "$FrontendDir\dist")) {
         Write-Host "Configurando Bucket S3 $BucketFront como sitio web estatico..." -ForegroundColor Cyan
