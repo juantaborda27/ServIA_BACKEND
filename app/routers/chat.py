@@ -1,9 +1,10 @@
 from fastapi import APIRouter, WebSocket, WebSocketException, status, WebSocketDisconnect, Depends
 from fastapi.responses import HTMLResponse
-from app.core.security import decode_token
+from app.core.security import decode_token, InvalidTokenError
 from app.services.dependencies import get_mensaje_service
 from app.services.mensaje_service import MensajeService
 from app.schemas.mensaje import MensajeCreate, MensajeResponse
+from app.core.connectionManager import ConnectionManager
 import json
 import uuid
 router = APIRouter(
@@ -11,7 +12,7 @@ router = APIRouter(
     tags=["Chat"]
 )
 
-
+manager_connection = ConnectionManager()
 
 html = """
 <!DOCTYPE html>
@@ -81,30 +82,42 @@ async def get_chat(conversacion_id: uuid.UUID,services: MensajeService = Depends
     
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str, services: MensajeService = Depends(get_mensaje_service),id_conversacion: uuid.UUID = None):
+async def websocket_endpoint(websocket: WebSocket, token: str, services: MensajeService = Depends(get_mensaje_service)):
+    is_conected = False
+    user_id = None
     try:
         user_id = decode_token(token).get("sub")
-        await websocket.accept()
-        websocket_connections[user_id] = websocket
-        print(websocket_connections)
+        if not user_id:
+            raise InvalidTokenError("Token inválido o expirado")
+        await manager_connection.connect(user_id, websocket)
+        is_conected = True
         while True:
             data = await websocket.receive_text()
             data = json.loads(data)
             destino = data["destino"]
             mensaje = data["mensaje"]
             id_conversacion = data["id_conversacion"]
-            ws=websocket_connections[destino]
-            await ws.send_text(f"Message text was: {mensaje}")
             datos = {
-                "id_remitente": user_id,
-                "id_destinatario": destino,
-                "contenido": mensaje,
-                "id_conversacion": id_conversacion}
+            "id_remitente": user_id,
+            "id_destinatario": destino,
+            "contenido": mensaje,
+            "id_conversacion": id_conversacion}
             datos = MensajeCreate(**datos)
+            
             await services.crear_mensaje(datos)
+            connections=manager_connection.get_connections(destino)
+            for ws in connections:
+                try:
+                    await ws.send_text(f"Message text was: {mensaje}")
+                except (WebSocketDisconnect, RuntimeError) as e:
+                    print(f"Error sending message to {destino}: {e}")
+                    manager_connection.disconnect(destino, ws)
+                
     except WebSocketDisconnect:
-        del websocket_connections[user_id]
-        print(websocket_connections)
-    except ValueError:
+        print(f"User {user_id} disconnected")
+    except InvalidTokenError:
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Token inválido o expirado")
+    finally:
+        if is_conected:
+            manager_connection.disconnect(user_id, websocket)
 
