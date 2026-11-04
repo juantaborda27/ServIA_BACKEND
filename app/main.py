@@ -9,10 +9,24 @@ from app.routers import prestador
 from app.routers import postulacion
 from app.routers import chat
 from app.routers import conversacion
+from app.core.database import engine, Base
+from app import models
+from contextlib import asynccontextmanager
+#from app.core.database_function import crear_funciones
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        #await crear_funciones(conn)
+    yield
+
+
 app = FastAPI(
     title="DataBaseServIA API",
     description="API para plataforma de servicios de Valledupar",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(

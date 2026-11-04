@@ -49,7 +49,7 @@ async def list_postulaciones(
         publicacion_id=publicacion_id,
         estado=estado.value if estado else None,
         limit=limit,
-        prestador_id=current_user.id,
+        user_id=str(current_user.id),
         offset=offset,
         incluir_prestador=incluir_prestador
     )
@@ -86,7 +86,6 @@ async def cambiar_estado_postulacion(
     current_user=Depends(get_current_user),
     services: PostulacionService = Depends(get_postulacion_service)
 ):
-
     return await services.cambiar_estado(
         postulacion_id,
         data.estado,
@@ -118,4 +117,3 @@ async def delete_postulacion(
         postulacion_id,
         current_user.id
     )
-

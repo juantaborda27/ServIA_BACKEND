@@ -1,11 +1,13 @@
 from typing import Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.postulacion import Postulacion
+from app.models.conversacion import Conversacion
 from app.models.prestador import Prestador
 
 
@@ -46,7 +48,9 @@ class PostulacionRepository:
         incluir_prestador: bool = False,
     ) -> list[Postulacion]:
 
-        stmt = select(Postulacion)
+        stmt = select(Postulacion).options(
+            selectinload(Postulacion.conversacion)
+        )
 
         if incluir_prestador:
             stmt = stmt.options(
@@ -131,3 +135,56 @@ class PostulacionRepository:
         await self.db.delete(postulacion)
         await self.db.commit()
         return postulacion
+
+    async def aceptar_postulacion(
+        self,
+        postulacion_id: str,
+        publicacion_id: str,
+    ) -> str:
+        try:
+            result = await self.db.execute(
+                select(Postulacion)
+                .where(Postulacion.id == postulacion_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            postulacion = result.scalar_one_or_none()
+            if not postulacion:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Postulación no encontrada",
+                )
+            if postulacion.estado != "pendiente":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Solo se pueden aceptar postulaciones pendientes",
+                )
+
+            postulacion.estado = "aceptada"
+            conversacion_result = await self.db.execute(
+                select(Conversacion).where(
+                    Conversacion.id_postulacion == postulacion.id
+                )
+            )
+            conversacion = conversacion_result.scalar_one_or_none()
+            if conversacion:
+                conversacion.estado = "activa"
+            else:
+                conversacion = Conversacion(id_postulacion=postulacion.id)
+                self.db.add(conversacion)
+                await self.db.flush()
+
+            stmt_espera = (
+                sa_update(Postulacion)
+                .where(Postulacion.publicacion_id == publicacion_id)
+                .where(Postulacion.id != postulacion_id)
+                .where(Postulacion.estado == "pendiente")
+                .values(estado="en_espera")
+            )
+            await self.db.execute(stmt_espera)
+            await self.db.commit()
+
+            return str(conversacion.id_conversacion)
+        except Exception:
+            await self.db.rollback()
+            raise
