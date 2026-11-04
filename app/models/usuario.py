@@ -34,3 +34,12 @@ class Usuario(Base):
     publicaciones: Mapped[list["Publicacion"]] = relationship(
         back_populates="usuario", cascade="all, delete-orphan"
     )
+    mensajes_enviados: Mapped[list["Mensaje"]] = relationship(
+        foreign_keys="Mensaje.id_remitente",
+        back_populates="remitente",
+    )
+
+    mensajes_recibidos: Mapped[list["Mensaje"]] = relationship(
+        foreign_keys="Mensaje.id_destinatario",
+        back_populates="destinatario",
+    )

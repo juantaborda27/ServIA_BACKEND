@@ -6,6 +6,8 @@ from app.repositories.dependencias import (
     get_publicacion_repository,
     get_servicio_repository,
     get_usuario_repository,
+    get_conversacion_repository,
+    get_mensaje_repository
 )
 from app.repositories.postulacion_repository import PostulacionRepository
 from app.repositories.prestador_repository import PrestadorRepository
@@ -17,6 +19,10 @@ from app.services.servicio_service import ServicioService
 from app.services.prestador_service import PrestadorService
 from app.services.post_service import PublicacionService
 from app.services.postulacion_service import PostulacionService
+from app.services.mensaje_service import MensajeService
+from app.services.conversacion_service import ConversacionService
+from app.repositories.conversacion_repository import ConversacionRepository
+from app.repositories.mensaje_repository import MensajeRepository
 
 # Nota: agrega aquí PublicacionService, PrestadorService, PostulacionService y
 # ServicioService siguiendo el mismo patrón cuando los conviertas (ver ejemplo
@@ -50,3 +56,13 @@ def get_postulacion_service(
     publicacion_repository: PublicacionRepository = Depends(get_publicacion_repository),
 ) -> PostulacionService:
     return PostulacionService(repository, publicacion_repository)
+
+def get_mensaje_service(
+    repository: MensajeRepository = Depends(get_mensaje_repository),
+) -> MensajeService:
+    return MensajeService(repository)
+
+def get_conversacion_service(
+    repository: ConversacionRepository = Depends(get_conversacion_repository),
+) -> ConversacionService:
+    return ConversacionService(repository)

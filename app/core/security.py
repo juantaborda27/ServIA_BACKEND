@@ -36,4 +36,9 @@ def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
-        raise ValueError("Token inválido o expirado")
+        raise InvalidTokenError("Token inválido o expirado")
+
+
+class InvalidTokenError(Exception):
+    pass
+
