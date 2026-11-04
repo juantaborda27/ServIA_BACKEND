@@ -17,8 +17,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8081"], 
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
@@ -37,3 +37,8 @@ def root():
     return {
         "message": "Bienvenido a la API de DataBaseServIA",
     }
+
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
