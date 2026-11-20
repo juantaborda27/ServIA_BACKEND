@@ -124,6 +124,16 @@ class PostulacionRepository:
         await self.db.commit()
         return list(result.scalars().all())
 
+    async def actualizar_estado_publicacion(self, publicacion_id: str, nuevo_estado: str):
+        from app.models.publicacion import Publicacion
+        stmt = (
+            sa_update(Publicacion)
+            .where(Publicacion.id == publicacion_id)
+            .values(estado=nuevo_estado)
+        )
+        await self.db.execute(stmt)
+        await self.db.commit()
+
     async def delete(self, postulacion_id: str) -> Optional[Postulacion]:
         stmt = select(Postulacion).where(Postulacion.id == postulacion_id)
         result = await self.db.execute(stmt)

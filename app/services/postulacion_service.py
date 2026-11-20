@@ -2,8 +2,9 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 
-from app.repositories.postulacion_repository import PostulacionRepository
+from app.models.notificacion import Notificacion
 from app.repositories.post_repository import PublicacionRepository
+from app.repositories.postulacion_repository import PostulacionRepository
 from app.schemas.postulacion import (
     EstadoPostulacion,
     PostulacionCreate,
@@ -13,17 +14,13 @@ from app.schemas.postulacion import (
 
 class PostulacionService:
 
-    def __init__(self,repository: PostulacionRepository, publicacion_repository: PublicacionRepository):
-
+    def __init__(self, repository: PostulacionRepository, publicacion_repository: PublicacionRepository):
         self.repository = repository
         self.publicacion_repository = publicacion_repository
 
     async def create_postulacion(self, data: PostulacionCreate, prestador_id: str):
-
         activa = await self.repository.get_activa(data.publicacion_id, prestador_id)
-
         if activa:
-
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Ya tienes una postulación activa para esta publicación"
@@ -33,27 +30,37 @@ class PostulacionService:
         payload["prestador_id"] = prestador_id
 
         postulacion = await self.repository.create(payload)
-
         if not postulacion:
-
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No se pudo crear la postulación"
             )
 
+        # Notificar al cliente dueño de la publicación
+        try:
+            pub = await self.publicacion_repository.get_by_id(data.publicacion_id)
+            if pub and pub.usuario_id:
+                notif = Notificacion(
+                    usuario_id=pub.usuario_id,
+                    titulo="¡Nueva propuesta recibida!",
+                    mensaje=f"Un profesional ha enviado una oferta de $ {data.precio_ofertado:,.0f} para tu solicitud.",
+                    tipo="oferta_recibida",
+                    referencia_id=str(pub.id),
+                )
+                self.repository.db.add(notif)
+                await self.repository.db.commit()
+        except Exception as e:
+            print("Error creando notificación de postulación:", e)
+
         return postulacion
 
     async def get_postulacion(self, postulacion_id: str):
-
         postulacion = await self.repository.get_by_id(postulacion_id)
-
         if not postulacion:
-
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Postulación no encontrada"
             )
-
         return postulacion
 
     async def list_postulaciones(
@@ -65,6 +72,7 @@ class PostulacionService:
         offset: int = 0,
         incluir_prestador: bool = False,
     ):
+<<<<<<< HEAD
         prestador_id = user_id
 
         if publicacion_id:
@@ -85,6 +93,9 @@ class PostulacionService:
             )
 
         postulaciones = await self.repository.list_all(
+=======
+        return await self.repository.list_all(
+>>>>>>> 610bbb7 (reseñas e historial de trabajo)
             publicacion_id=publicacion_id,
             prestador_id=prestador_id,
             estado=estado,
@@ -103,12 +114,10 @@ class PostulacionService:
         data: PostulacionUpdate,
         prestador_id: str,
     ):
-
         postulacion = await self.get_postulacion(postulacion_id)
         await self._verificar_dueno_postulacion(postulacion, prestador_id)
 
         update_data = data.model_dump(exclude_unset=True, mode="json")
-
         return await self.repository.update(postulacion_id, update_data)
 
     async def cambiar_estado(
@@ -119,7 +128,9 @@ class PostulacionService:
     ):
         postulacion = await self.get_postulacion(postulacion_id)
 
+        pub_id = str(getattr(postulacion, "publicacion_id", None) or postulacion.get("publicacion_id"))
         if nuevo_estado == EstadoPostulacion.aceptada:
+<<<<<<< HEAD
             await self._verificar_dueno_publicacion(postulacion, user_id)
 
             if postulacion.estado != "pendiente":
@@ -131,8 +142,16 @@ class PostulacionService:
             id_conversacion = await self.repository.aceptar_postulacion(
                 postulacion_id=postulacion_id,
                 publicacion_id=str(postulacion.publicacion_id),
+=======
+            await self.repository.poner_en_espera_otras(
+                pub_id,
+                postulacion_id,
+>>>>>>> 610bbb7 (reseñas e historial de trabajo)
             )
+            # Sincronizar estado de la publicación a "acuerdo"
+            await self.repository.actualizar_estado_publicacion(pub_id, "acuerdo")
 
+<<<<<<< HEAD
             return {
                 "message": "Postulación aceptada correctamente",
                 "id_conversacion": id_conversacion,
@@ -155,28 +174,54 @@ class PostulacionService:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Estado de postulación no permitido",
         )
+=======
+            # Notificar al trabajador que su oferta fue aceptada
+            try:
+                prestador_uid = getattr(postulacion, "prestador_id", None) or postulacion.get("prestador_id")
+                if prestador_uid:
+                    notif = Notificacion(
+                        usuario_id=prestador_uid,
+                        titulo="¡Tu oferta fue aceptada!",
+                        mensaje="El cliente ha seleccionado tu propuesta. ¡Comunícate por mensaje para coordinar los detalles!",
+                        tipo="oferta_aceptada",
+                        referencia_id=pub_id,
+                    )
+                    self.repository.db.add(notif)
+                    await self.repository.db.commit()
+            except Exception as e:
+                print("Error creando notificación de aceptación:", e)
+
+        return actualizada
+>>>>>>> ffcece1 (feat: actualizacion pantallas y notificaciones)
 
     async def revertir_aceptacion(self, postulacion_id: str, user_id: str):
         """Si el cliente se arrepiente, vuelve la postulación aceptada a pendiente."""
-
         postulacion = await self.get_postulacion(postulacion_id)
         await self._verificar_dueno_publicacion(postulacion, user_id)
 
+<<<<<<< HEAD
         if postulacion.estado != "aceptada":
+=======
+        estado_val = getattr(postulacion, "estado", None) or postulacion.get("estado")
+        if estado_val != "aceptada":
+>>>>>>> 610bbb7 (reseñas e historial de trabajo)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Solo se puede revertir una postulación aceptada"
             )
 
+        pub_id = str(getattr(postulacion, "publicacion_id", None) or postulacion.get("publicacion_id"))
+        await self.repository.actualizar_estado_publicacion(pub_id, "activo")
         return await self.repository.update(postulacion_id, {"estado": "pendiente"})
 
     async def delete_postulacion(self, postulacion_id: str, prestador_id: str):
-
         postulacion = await self.get_postulacion(postulacion_id)
         await self._verificar_dueno_postulacion(postulacion, prestador_id)
 
         await self.repository.delete(postulacion_id)
+        return {"message": "Postulación eliminada correctamente"}
 
+<<<<<<< HEAD
         return {"message": "Postulación eliminada correctamente"}
 
     @staticmethod
@@ -226,3 +271,28 @@ class PostulacionService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permiso sobre esta publicación",
             )
+=======
+    @staticmethod
+    async def _verificar_dueno_postulacion(postulacion, prestador_id: str):
+        pid = str(getattr(postulacion, "prestador_id", None) or postulacion.get("prestador_id"))
+        if pid != str(prestador_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permiso sobre esta postulación"
+            )
+
+    async def _verificar_dueno_publicacion(self, postulacion, user_id: str):
+        pub_id = str(getattr(postulacion, "publicacion_id", None) or postulacion.get("publicacion_id"))
+        publicacion = await self.publicacion_repository.get_by_id(pub_id)
+        if not publicacion:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Publicación vinculada no encontrada"
+            )
+        owner_id = str(getattr(publicacion, "usuario_id", None) or publicacion.get("usuario_id"))
+        if owner_id != str(user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo el autor de la publicación puede gestionar las ofertas"
+            )
+>>>>>>> 610bbb7 (reseñas e historial de trabajo)

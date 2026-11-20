@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -26,12 +26,24 @@ class PublicacionCreate(BaseModel):
     descripcion: str
     categoria_id: str
     urgencia: NivelUrgencia
+    direccion: Optional[str] = "Valledupar, Cesar"
+    barrio: Optional[str] = "Valledupar"
+    referencia: Optional[str] = None
+    ciudad: Optional[str] = "Valledupar"
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
 
 
 class PublicacionUpdate(BaseModel):
     descripcion: Optional[str] = None
     categoria_id: Optional[str] = None
     urgencia: Optional[NivelUrgencia] = None
+    direccion: Optional[str] = None
+    barrio: Optional[str] = None
+    referencia: Optional[str] = None
+    ciudad: Optional[str] = None
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
 
 
 class PublicacionEstadoUpdate(BaseModel):
@@ -44,6 +56,15 @@ class PublicacionResponse(BaseModel):
     categoria_id: str
     urgencia: NivelUrgencia
     usuario_id: str
+    direccion: Optional[str] = None
+    barrio: Optional[str] = None
+    referencia: Optional[str] = None
+    ciudad: Optional[str] = "Valledupar"
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    ha_sido_calificada: bool = False
     estado: EstadoPublicacion
-    created_at: str
-    updated_at: str
+    created_at: Any
+    updated_at: Any
+    categoria: Optional[Any] = None
+    usuario: Optional[Any] = None

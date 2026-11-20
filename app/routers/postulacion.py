@@ -37,6 +37,7 @@ async def create_postulacion(
 @router.get("")
 async def list_postulaciones(
     publicacion_id: Optional[str] = None,
+    prestador_id: Optional[str] = None,
     current_user=Depends(get_current_user),
     estado: Optional[EstadoPostulacion] = None,
     limit: int = Query(20, le=100),
@@ -44,6 +45,12 @@ async def list_postulaciones(
     incluir_prestador: bool = Query(False),
     services: PostulacionService = Depends(get_postulacion_service)
 ):
+    # Si se envía publicacion_id (ej. el cliente viendo ofertas recibidas),
+    # no restringimos por prestador_id a menos que se especifique explícitamente.
+    # Si no se envía publicacion_id, se asume que es el prestador consultando sus postulaciones.
+    filtro_prestador = prestador_id
+    if not publicacion_id and not filtro_prestador:
+        filtro_prestador = current_user.id
 
     return await services.list_postulaciones(
         publicacion_id=publicacion_id,
@@ -51,7 +58,7 @@ async def list_postulaciones(
         limit=limit,
         user_id=str(current_user.id),
         offset=offset,
-        incluir_prestador=incluir_prestador
+        incluir_prestador=incluir_prestador or bool(publicacion_id)
     )
 
 

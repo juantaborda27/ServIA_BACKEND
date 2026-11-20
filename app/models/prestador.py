@@ -34,3 +34,6 @@ class Prestador(Base):
     postulaciones: Mapped[list["Postulacion"]] = relationship(
         back_populates="prestador", cascade="all, delete-orphan"
     )
+    resenas: Mapped[list["Resena"]] = relationship(
+        back_populates="prestador", cascade="all, delete-orphan"
+    )

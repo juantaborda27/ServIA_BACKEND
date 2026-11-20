@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Text, func, text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,6 +28,13 @@ class Publicacion(Base):
     usuario_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False
     )
+    direccion: Mapped[str | None] = mapped_column(Text, nullable=True, server_default="Valledupar, Cesar")
+    barrio: Mapped[str | None] = mapped_column(Text, nullable=True, server_default="Valledupar")
+    referencia: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ciudad: Mapped[str | None] = mapped_column(String(100), nullable=True, server_default="Valledupar")
+    latitud: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitud: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ha_sido_calificada: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
     estado: Mapped[str] = mapped_column(
         EstadoPublicacionEnum, nullable=False, server_default="activo"
     )
@@ -41,5 +48,8 @@ class Publicacion(Base):
     categoria: Mapped["Categoria"] = relationship(back_populates="publicaciones")
     usuario: Mapped["Usuario"] = relationship(back_populates="publicaciones")
     postulaciones: Mapped[list["Postulacion"]] = relationship(
+        back_populates="publicacion", cascade="all, delete-orphan"
+    )
+    resenas: Mapped[list["Resena"]] = relationship(
         back_populates="publicacion", cascade="all, delete-orphan"
     )

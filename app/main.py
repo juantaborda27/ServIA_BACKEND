@@ -7,6 +7,7 @@ from app.routers import servicios
 from app.routers import post
 from app.routers import prestador
 from app.routers import postulacion
+<<<<<<< HEAD
 from app.routers import chat
 from app.routers import conversacion
 from app.core.database import engine, Base
@@ -22,6 +23,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
+=======
+from app.routers import resenas
+from app.routers import notificacion
+from app.routers import health
+>>>>>>> 610bbb7 (reseñas e historial de trabajo)
 app = FastAPI(
     title="DataBaseServIA API",
     description="API para plataforma de servicios de Valledupar",
@@ -43,8 +49,14 @@ app.include_router(servicios.router)
 app.include_router(post.router)
 app.include_router(prestador.router)
 app.include_router(postulacion.router)
+<<<<<<< HEAD
 app.include_router(chat.router)
 app.include_router(conversacion.router)
+=======
+app.include_router(resenas.router)
+app.include_router(notificacion.router)
+app.include_router(health.router)
+>>>>>>> 610bbb7 (reseñas e historial de trabajo)
 # 4. Ruta raíz
 @app.get("/")
 def root():

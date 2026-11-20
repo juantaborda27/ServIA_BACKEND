@@ -2,9 +2,11 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.repositories.notificacion_repository import NotificacionRepository
 from app.repositories.postulacion_repository import PostulacionRepository
 from app.repositories.prestador_repository import PrestadorRepository
 from app.repositories.post_repository import PublicacionRepository
+from app.repositories.resena_repository import ResenaRepository
 from app.repositories.servicio_repository import ServicioRepository
 from app.repositories.usuario_repository import UsuarioRepository
 from app.services.conversacion_service import ConversacionRepository
@@ -40,6 +42,7 @@ def get_usuario_repository(
 ) -> UsuarioRepository:
     return UsuarioRepository(db)
 
+<<<<<<< HEAD
 def get_conversacion_repository(
     db: AsyncSession = Depends(get_db),
 ) -> ConversacionRepository:
@@ -49,3 +52,19 @@ def get_mensaje_repository(
     db: AsyncSession = Depends(get_db),
 ) -> MensajeRepository:
     return MensajeRepository(db)
+=======
+
+def get_resena_repository(
+    db: AsyncSession = Depends(get_db),
+) -> ResenaRepository:
+    return ResenaRepository(db)
+<<<<<<< HEAD
+>>>>>>> 610bbb7 (reseñas e historial de trabajo)
+=======
+
+
+def get_notificacion_repository(
+    db: AsyncSession = Depends(get_db),
+) -> NotificacionRepository:
+    return NotificacionRepository(db)
+>>>>>>> ffcece1 (feat: actualizacion pantallas y notificaciones)
