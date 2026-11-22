@@ -104,6 +104,7 @@ class PublicacionRepository:
                 selectinload(Publicacion.usuario),
                 selectinload(Publicacion.categoria),
                 selectinload(Publicacion.resenas),
+                selectinload(Postulacion.conversacion),
             )
             .where(
                 Postulacion.prestador_id == prestador_id,
@@ -138,6 +139,8 @@ class PublicacionRepository:
                 "id": str(pub.id),
                 "publicacion_id": str(pub.id),
                 "postulacion_id": str(post.id),
+                "conversation_id": str(post.conversacion.id_conversacion) if getattr(post, "conversacion", None) else None,
+                "cliente_id": str(pub.usuario_id),
                 "title": pub.descripcion[:50] + ("..." if len(pub.descripcion) > 50 else ""),
                 "description": pub.descripcion,
                 "categoria_id": str(pub.categoria_id),

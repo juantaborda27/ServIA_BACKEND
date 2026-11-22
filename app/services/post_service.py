@@ -87,16 +87,18 @@ class PublicacionService:
         )
 
     async def iniciar_trabajo(self, publicacion_id: str, user_id: str):
-        """El prestador o cliente inicia formalmente el trabajo."""
+        """Solo el cliente dueño de la solicitud tiene el poder de iniciar formalmente el trabajo."""
         publicacion = await self.get_publicacion(publicacion_id)
+        await self._verificar_dueno(publicacion, user_id)
         return await self.repository.update(
             publicacion_id,
             {"estado": "en_progreso"}
         )
 
     async def completar_trabajo(self, publicacion_id: str, user_id: str):
-        """Finaliza el trabajo; tras esto se activará la reseña obligatoria."""
+        """Solo el cliente dueño de la solicitud tiene el poder de finalizar el trabajo; tras esto califica obligatoriamente."""
         publicacion = await self.get_publicacion(publicacion_id)
+        await self._verificar_dueno(publicacion, user_id)
         return await self.repository.update(
             publicacion_id,
             {"estado": "terminado"}

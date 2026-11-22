@@ -1,8 +1,10 @@
 from typing import Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 
 from app.models.notificacion import Notificacion
+from app.models.prestador import Prestador
 from app.repositories.post_repository import PublicacionRepository
 from app.repositories.postulacion_repository import PostulacionRepository
 from app.schemas.postulacion import (
@@ -24,6 +26,16 @@ class PostulacionService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Ya tienes una postulación activa para esta publicación"
+            )
+
+        # Validar que el profesional cuente con saldo disponible para comisiones de intermediación
+        stmt = select(Prestador).where(Prestador.id == prestador_id)
+        res = await self.repository.db.execute(stmt)
+        prestador_obj = res.scalar_one_or_none()
+        if not prestador_obj or float(getattr(prestador_obj, "saldo", 0.0) or 0.0) <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Saldo insuficiente. Debes recargar tu saldo para poder enviar ofertas a las solicitudes."
             )
 
         payload = data.model_dump(mode="json")
@@ -141,14 +153,27 @@ class PostulacionService:
             # Sincronizar estado de la publicación a "acuerdo"
             await self.repository.actualizar_estado_publicacion(pub_id, "acuerdo")
 
-            # Notificar al trabajador que su oferta fue aceptada
+            # Cobro de porcentaje por intermediación/conexión (7% del precio ofertado al aceptar la propuesta)
+            prestador_uid = getattr(postulacion, "prestador_id", None)
+            precio_ofertado = float(getattr(postulacion, "precio_ofertado", 0.0) or 0.0)
+            comision_7 = round(precio_ofertado * 0.07, 2)
+
+            if prestador_uid:
+                stmt = select(Prestador).where(Prestador.id == prestador_uid)
+                res = await self.repository.db.execute(stmt)
+                prestador_obj = res.scalar_one_or_none()
+                if prestador_obj:
+                    saldo_actual = float(getattr(prestador_obj, "saldo", 0.0) or 0.0)
+                    prestador_obj.saldo = max(0.0, round(saldo_actual - comision_7, 2))
+                    await self.repository.db.commit()
+
+            # Notificar al trabajador que su oferta fue aceptada y se cobró la tarifa de intermediación
             try:
-                prestador_uid = getattr(postulacion, "prestador_id", None)
                 if prestador_uid:
                     notif = Notificacion(
                         usuario_id=prestador_uid,
                         titulo="¡Tu oferta fue aceptada!",
-                        mensaje="El cliente ha seleccionado tu propuesta. ¡Comunícate por mensaje para coordinar los detalles!",
+                        mensaje=f"El cliente aceptó tu propuesta de ${precio_ofertado:,.0f} COP. Se aplicó la tarifa fija del 7% por intermediación (${comision_7:,.0f} COP). ¡Comunícate por mensaje para coordinar los detalles!",
                         tipo="oferta_aceptada",
                         referencia_id=pub_id,
                     )
@@ -161,6 +186,7 @@ class PostulacionService:
                 "message": "Postulación aceptada correctamente",
                 "id_conversacion": id_conversacion,
                 "estado": "aceptada",
+                "comision_cobrada": comision_7,
             }
 
         if nuevo_estado == EstadoPostulacion.rechazada:

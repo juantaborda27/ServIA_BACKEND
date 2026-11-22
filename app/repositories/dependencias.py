@@ -9,8 +9,8 @@ from app.repositories.post_repository import PublicacionRepository
 from app.repositories.resena_repository import ResenaRepository
 from app.repositories.servicio_repository import ServicioRepository
 from app.repositories.usuario_repository import UsuarioRepository
-from app.services.conversacion_service import ConversacionRepository
-from app.services.mensaje_service import MensajeRepository
+from app.repositories.conversacion_repository import ConversacionRepository
+from app.repositories.mensaje_repository import MensajeRepository
 
 
 def get_publicacion_repository(

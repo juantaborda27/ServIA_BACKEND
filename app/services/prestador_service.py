@@ -9,8 +9,72 @@ from app.schemas.prestador import PrestadorCreate, PrestadorUpdate
 
 class PrestadorService:
 
-    def __init__(self, repository: PrestadorRepository):
+    def __init__(self, repository: PrestadorRepository, publicacion_repository=None):
         self.repository = repository
+        self.publicacion_repository = publicacion_repository
+
+    async def get_mi_saldo(self, prestador_id: str):
+        prestador = await self.repository.get_by_id(prestador_id)
+        if not prestador:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Prestador no encontrado"
+            )
+
+        trabajos = []
+        if self.publicacion_repository:
+            # Conexiones generadas donde el cliente aceptó la oferta (acuerdo, en progreso o terminado)
+            trabajos = await self.publicacion_repository.get_trabajos_prestador(
+                prestador_id, ["acuerdo", "en_progreso", "terminado"]
+            )
+
+        total_estimado = sum(float(t.get("price") or 0.0) for t in trabajos)
+        tarifa_porcentaje = 7.0
+        total_comision = round(total_estimado * 0.07, 2)
+        saldo_disponible = float(getattr(prestador, "saldo", 0.0) or 0.0)
+
+        movimientos = []
+        for t in trabajos:
+            price = float(t.get("price") or 0.0)
+            movimientos.append({
+                "id": str(t.get("id")),
+                "title": t.get("title") or t.get("description") or "Conexión con cliente",
+                "client": t.get("client") or "Cliente",
+                "date": t.get("updated_at") or t.get("created_at"),
+                "amount": price,
+                "commission": round(price * 0.07, 2),
+            })
+
+        return {
+            "saldo_disponible": saldo_disponible,
+            "total_facturado_estimado": total_estimado,
+            "tarifa_porcentaje": tarifa_porcentaje,
+            "total_comision": total_comision,
+            "trabajos": movimientos,
+            "mensaje": "La tarifa fija del 7% se cobra por intermediación y conexión cuando el cliente acepta la oferta realizada. El cobro del servicio es acordado y pagado directamente entre cliente y profesional."
+        }
+
+    async def recargar_saldo(self, prestador_id: str, monto: float):
+        if monto <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El monto a recargar debe ser mayor a 0"
+            )
+        prestador = await self.repository.get_by_id(prestador_id)
+        if not prestador:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Prestador no encontrado"
+            )
+
+        saldo_actual = float(getattr(prestador, "saldo", 0.0) or 0.0)
+        nuevo_saldo = round(saldo_actual + monto, 2)
+        await self.repository.update(prestador_id, {"saldo": nuevo_saldo})
+        return {
+            "message": "Saldo recargado exitosamente",
+            "monto_recargado": monto,
+            "saldo_disponible": nuevo_saldo
+        }
 
     async def create_prestador(self, data: PrestadorCreate, user_id: str):
 

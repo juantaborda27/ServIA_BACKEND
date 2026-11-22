@@ -6,7 +6,7 @@ from app.dependencies.auth import get_current_user
 from app.services.dependencies import get_prestador_service
 from app.services.prestador_service import PrestadorService
 
-from app.schemas.prestador import PrestadorCreate, PrestadorUpdate
+from app.schemas.prestador import PrestadorCreate, PrestadorUpdate, RecargarSaldoRequest
 
 
 router = APIRouter(
@@ -54,6 +54,25 @@ async def get_mi_perfil_prestador(
     services: PrestadorService = Depends(get_prestador_service)
 ):
     return await services.get_prestador(current_user.id)
+
+
+@router.get("/mi-saldo")
+async def get_mi_saldo(
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service)
+):
+    """Obtiene el resumen financiero del prestador: saldo actual, total estimado de trabajos y comisión del 7%."""
+    return await services.get_mi_saldo(current_user.id)
+
+
+@router.post("/recargar-saldo")
+async def recargar_saldo(
+    data: RecargarSaldoRequest,
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service)
+):
+    """Recarga el saldo de la cuenta del prestador para cubrir comisiones por trabajos."""
+    return await services.recargar_saldo(current_user.id, data.monto)
 
 
 @router.get("/{prestador_id}")
