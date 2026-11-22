@@ -42,29 +42,25 @@ def get_usuario_repository(
 ) -> UsuarioRepository:
     return UsuarioRepository(db)
 
-<<<<<<< HEAD
 def get_conversacion_repository(
     db: AsyncSession = Depends(get_db),
 ) -> ConversacionRepository:
     return ConversacionRepository(db)
 
+
 def get_mensaje_repository(
     db: AsyncSession = Depends(get_db),
 ) -> MensajeRepository:
     return MensajeRepository(db)
-=======
+
 
 def get_resena_repository(
     db: AsyncSession = Depends(get_db),
 ) -> ResenaRepository:
     return ResenaRepository(db)
-<<<<<<< HEAD
->>>>>>> 610bbb7 (reseñas e historial de trabajo)
-=======
 
 
 def get_notificacion_repository(
     db: AsyncSession = Depends(get_db),
 ) -> NotificacionRepository:
     return NotificacionRepository(db)
->>>>>>> ffcece1 (feat: actualizacion pantallas y notificaciones)
