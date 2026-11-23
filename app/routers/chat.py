@@ -1,8 +1,13 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, WebSocketException, status
 from fastapi.responses import HTMLResponse
 from pydantic import ValidationError
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
 from app.core.security import decode_token, InvalidTokenError
 from app.dependencies.auth import get_current_user
+from app.models.notificacion import Notificacion
 from app.services.dependencies import get_mensaje_service
 from app.services.mensaje_service import MensajeService
 from app.schemas.mensaje import MensajeCreate, MensajeResponse

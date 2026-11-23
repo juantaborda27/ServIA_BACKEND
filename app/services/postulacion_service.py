@@ -126,7 +126,6 @@ class PostulacionService:
                 "message": "Postulación aceptada correctamente",
                 "id_conversacion": id_conversacion,
                 "estado": "aceptada",
-                "comision_cobrada": comision_7,
             }
 
         postulacion = await self.get_postulacion(postulacion_id)
