@@ -3,6 +3,10 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[str, set[WebSocket]] = {}
 
+    @staticmethod
+    def build_key(user_id: str, rol: str) -> str:
+        return f"{user_id}:{rol}"
+
     async def connect(self, user_id: str, websocket: WebSocket):
         await websocket.accept()
         if user_id not in self.active_connections:

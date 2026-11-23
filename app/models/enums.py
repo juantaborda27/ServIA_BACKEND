@@ -10,6 +10,7 @@ EstadoPostulacionEnum = Enum(
     "aceptada",
     "rechazada",
     "en_espera",
+    "retirada",
     name="estado_postulacion",
     create_type=False,
 )
@@ -31,9 +32,11 @@ EstadoPublicacionEnum = Enum(
     "activo",
     "acuerdo",
     "en_progreso",
+    "pendiente_confirmacion",
     "terminado",
     "cancelado",
     "expirado",
+    "en_disputa",
     name="estado_publicacion",
     create_type=False,
 )

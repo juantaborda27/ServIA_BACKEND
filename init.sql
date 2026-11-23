@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 1. TIPOS ENUM PERSONALIZADOS (Idempotentes)
 -- =============================================================================
 DO $$ BEGIN
-    CREATE TYPE estado_postulacion AS ENUM ('pendiente', 'aceptada', 'rechazada', 'en_espera');
+    CREATE TYPE estado_postulacion AS ENUM ('pendiente', 'aceptada', 'rechazada', 'en_espera', 'retirada');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -22,7 +22,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE estado_publicacion AS ENUM ('activo', 'acuerdo', 'en_progreso', 'terminado', 'cancelado', 'expirado');
+    CREATE TYPE estado_publicacion AS ENUM ('activo', 'acuerdo', 'en_progreso', 'pendiente_confirmacion', 'terminado', 'cancelado', 'expirado', 'en_disputa');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -104,8 +104,14 @@ CREATE TABLE IF NOT EXISTS publicaciones (
     ciudad VARCHAR(100) DEFAULT 'Valledupar',
     latitud DOUBLE PRECISION,
     longitud DOUBLE PRECISION,
-    ha_sido_calificada BOOLEAN DEFAULT FALSE,
+    ha_sido_calificada BOOLEAN NOT NULL DEFAULT FALSE,
     estado estado_publicacion NOT NULL DEFAULT 'activo',
+    started_at TIMESTAMPTZ,
+    completion_requested_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    cancelled_at TIMESTAMPTZ,
+    cancelled_by UUID REFERENCES usuarios(id),
+    cancellation_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
@@ -119,6 +125,7 @@ CREATE TABLE IF NOT EXISTS postulaciones (
     disponibilidad VARCHAR(100) NOT NULL,
     mensaje TEXT NOT NULL,
     estado estado_postulacion NOT NULL DEFAULT 'pendiente',
+    retirada_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     CONSTRAINT uq_prestador_solicitud UNIQUE (publicacion_id, prestador_id)
@@ -135,6 +142,46 @@ CREATE TABLE IF NOT EXISTS resenas (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     CONSTRAINT uq_resena_publicacion_cliente UNIQUE (publicacion_id, cliente_id)
 );
+
+-- 2.10 Conversaciones (1:1 con postulación aceptada)
+CREATE TABLE IF NOT EXISTS conversaciones (
+    id_conversacion UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_postulacion UUID NOT NULL UNIQUE REFERENCES postulaciones(id) ON DELETE CASCADE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'activa',
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    closed_at TIMESTAMPTZ,
+    delete_after TIMESTAMPTZ
+);
+
+-- 2.11 Mensajes del Chat
+CREATE TABLE IF NOT EXISTS mensajes (
+    id_mensaje UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    contenido TEXT NOT NULL,
+    fecha_hora TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
+    id_conversacion UUID REFERENCES conversaciones(id_conversacion) ON DELETE CASCADE,
+    id_remitente UUID REFERENCES usuarios(id),
+    id_destinatario UUID REFERENCES usuarios(id)
+);
+
+-- 2.12 Notificaciones
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    titulo VARCHAR(200) NOT NULL,
+    mensaje TEXT NOT NULL,
+    tipo VARCHAR(50) NOT NULL DEFAULT 'sistema',
+    leida BOOLEAN NOT NULL DEFAULT FALSE,
+    referencia_id VARCHAR(100),
+    data JSONB,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- Índices
+CREATE INDEX IF NOT EXISTS idx_publicaciones_estado ON publicaciones(estado);
+CREATE INDEX IF NOT EXISTS idx_postulaciones_pub_estado ON postulaciones(publicacion_id, estado);
+CREATE INDEX IF NOT EXISTS idx_mensajes_conversacion ON mensajes(id_conversacion, fecha_hora);
+CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario ON notificaciones(usuario_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversaciones_delete_after ON conversaciones(estado, delete_after);
 
 -- =============================================================================
 -- 3. TRIGGERS PARA ACTUALIZACIÓN AUTOMÁTICA DE updated_at

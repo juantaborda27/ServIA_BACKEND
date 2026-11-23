@@ -11,6 +11,8 @@ from app.routers import chat
 from app.routers import conversacion
 from app.routers import resenas
 from app.routers import notificacion
+from app.routers import categoria
+from app.routers import ubicacion
 from app.core.database import engine, Base
 from app import models
 from contextlib import asynccontextmanager
@@ -33,8 +35,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["*"], 
-    allow_headers=["*"], 
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    # En desarrollo evitamos conservar políticas preflight antiguas en el navegador.
+    max_age=0,
 )
 
 app.include_router(auth.router)
@@ -47,6 +51,8 @@ app.include_router(chat.router)
 app.include_router(conversacion.router)
 app.include_router(resenas.router)
 app.include_router(notificacion.router)
+app.include_router(categoria.router)
+app.include_router(ubicacion.router)
 # 4. Ruta raíz
 @app.get("/")
 def root():

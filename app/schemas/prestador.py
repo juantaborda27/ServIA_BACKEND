@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, StringConstraints
+from typing import Annotated, Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -54,3 +54,9 @@ class PrestadorResponse(PrestadorBase):
 
     class Config:
         from_attributes = True
+
+
+class UbicacionPrestador(BaseModel):
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+    direccion: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=250)]

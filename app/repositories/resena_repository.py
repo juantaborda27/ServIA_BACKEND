@@ -116,8 +116,11 @@ class ResenaRepository:
             "publicacion_id": str(pub.id),
             "titulo": pub.descripcion[:60],
             "descripcion": pub.descripcion,
-            "categoria": pub.categoria.nombre if pub.categoria else "Servicio",
-            "categoria_icono": pub.categoria.icono if pub.categoria else "construct-outline",
+            "categoria": {
+                "id": str(pub.categoria.id) if pub.categoria else str(pub.categoria_id),
+                "nombre": pub.categoria.nombre if pub.categoria else "Servicio",
+                "icono": (pub.categoria.icono or "construct-outline") if pub.categoria else "construct-outline",
+            },
             "prestador_id": str(post.prestador_id),
             "prestador_nombre": prestador_user.nombre_completo if prestador_user else "Profesional",
             "prestador_foto": prestador_user.foto_perfil if prestador_user else None,

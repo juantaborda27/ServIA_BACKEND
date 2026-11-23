@@ -22,15 +22,16 @@ class NotificacionService:
             tipo=notif.tipo,
             leida=notif.leida,
             referencia_id=notif.referencia_id,
+            data=notif.data,
             created_at=notif.created_at.isoformat() if notif.created_at else None,
         )
 
     async def list_notificaciones(
-        self, user_id: str, limit: int = 50, offset: int = 0
+        self, user_id: str, rol: str, limit: int = 50, offset: int = 0
     ) -> ListaNotificacionesResponse:
-        total = await self.repository.count_total(user_id)
-        no_leidas = await self.repository.count_unread(user_id)
-        items = await self.repository.list_by_user(user_id, limit, offset)
+        total = await self.repository.count_total(user_id, rol)
+        no_leidas = await self.repository.count_unread(user_id, rol)
+        items = await self.repository.list_by_user(user_id, rol, limit, offset)
 
         dtos = [
             NotificacionResponse(
@@ -41,6 +42,7 @@ class NotificacionService:
                 tipo=n.tipo,
                 leida=n.leida,
                 referencia_id=n.referencia_id,
+                data=n.data,
                 created_at=n.created_at.isoformat() if n.created_at else None,
             )
             for n in items
@@ -52,11 +54,11 @@ class NotificacionService:
             notificaciones=dtos,
         )
 
-    async def mark_as_read(self, notif_id: str, user_id: str) -> bool:
-        return await self.repository.mark_as_read(notif_id, user_id)
+    async def mark_as_read(self, notif_id: str, user_id: str, rol: str) -> bool:
+        return await self.repository.mark_as_read(notif_id, user_id, rol)
 
-    async def mark_all_as_read(self, user_id: str) -> int:
-        return await self.repository.mark_all_as_read(user_id)
+    async def mark_all_as_read(self, user_id: str, rol: str) -> int:
+        return await self.repository.mark_all_as_read(user_id, rol)
 
-    async def delete_notificacion(self, notif_id: str, user_id: str) -> bool:
-        return await self.repository.delete(notif_id, user_id)
+    async def delete_notificacion(self, notif_id: str, user_id: str, rol: str) -> bool:
+        return await self.repository.delete(notif_id, user_id, rol)

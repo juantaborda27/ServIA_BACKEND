@@ -1,10 +1,13 @@
 from typing import Optional
 
 from fastapi import HTTPException, status
+from fastapi.encoders import jsonable_encoder
+from app.core.ubicacion import distancia_km
 
 from app.models.notificacion import Notificacion
 from app.repositories.post_repository import PublicacionRepository
 from app.repositories.postulacion_repository import PostulacionRepository
+from app.services.post_service import PublicacionService
 from app.schemas.postulacion import (
     EstadoPostulacion,
     PostulacionCreate,
@@ -19,40 +22,8 @@ class PostulacionService:
         self.publicacion_repository = publicacion_repository
 
     async def create_postulacion(self, data: PostulacionCreate, prestador_id: str):
-        activa = await self.repository.get_activa(data.publicacion_id, prestador_id)
-        if activa:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Ya tienes una postulación activa para esta publicación"
-            )
-
         payload = data.model_dump(mode="json")
-        payload["prestador_id"] = prestador_id
-
-        postulacion = await self.repository.create(payload)
-        if not postulacion:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No se pudo crear la postulación"
-            )
-
-        # Notificar al cliente dueño de la publicación
-        try:
-            pub = await self.publicacion_repository.get_by_id(data.publicacion_id)
-            if pub and pub.usuario_id:
-                notif = Notificacion(
-                    usuario_id=pub.usuario_id,
-                    titulo="¡Nueva propuesta recibida!",
-                    mensaje=f"Un profesional ha enviado una oferta de $ {data.precio_ofertado:,.0f} para tu solicitud.",
-                    tipo="oferta_recibida",
-                    referencia_id=str(pub.id),
-                )
-                self.repository.db.add(notif)
-                await self.repository.db.commit()
-        except Exception as e:
-            print("Error creando notificación de postulación:", e)
-
-        return postulacion
+        return await self.repository.crear_con_validaciones(payload, str(prestador_id))
 
     async def get_postulacion(self, postulacion_id: str):
         postulacion = await self.repository.get_by_id(postulacion_id)
@@ -62,6 +33,13 @@ class PostulacionService:
                 detail="Postulación no encontrada"
             )
         return postulacion
+
+    async def get_postulacion_visible(self, postulacion_id: str):
+        postulacion = await self.get_postulacion(postulacion_id)
+        data = jsonable_encoder(postulacion, exclude={"prestador", "publicacion"})
+        if postulacion.publicacion is not None:
+            data["publicacion"] = PublicacionService._publicacion_visible(postulacion.publicacion)
+        return data
 
     async def list_postulaciones(
         self,
@@ -73,6 +51,7 @@ class PostulacionService:
         incluir_prestador: bool = False,
     ):
         prestador_id = user_id
+        publicacion = None
 
         if publicacion_id:
             publicacion = await self.publicacion_repository.get_by_id(
@@ -99,8 +78,23 @@ class PostulacionService:
             offset=offset,
             incluir_prestador=incluir_prestador,
         )
+        ocupacion_por_prestador = {}
+        if incluir_prestador:
+            for postulacion in postulaciones:
+                prestador_id_actual = str(postulacion.prestador_id)
+                if prestador_id_actual not in ocupacion_por_prestador:
+                    ocupacion_por_prestador[prestador_id_actual] = (
+                        await self.repository.prestador_tiene_trabajo_activo(
+                            prestador_id_actual
+                        )
+                    )
         return [
-            self._serializar_postulacion(postulacion, incluir_prestador)
+            self._serializar_postulacion(
+                postulacion,
+                incluir_prestador,
+                ocupacion_por_prestador.get(str(postulacion.prestador_id), False),
+                publicacion,
+            )
             for postulacion in postulaciones
         ]
 
@@ -122,63 +116,49 @@ class PostulacionService:
         nuevo_estado: EstadoPostulacion,
         user_id: str,
     ):
-        postulacion = await self.get_postulacion(postulacion_id)
-
-        pub_id = str(getattr(postulacion, "publicacion_id", None) or postulacion.get("publicacion_id"))
         if nuevo_estado == EstadoPostulacion.aceptada:
-            await self._verificar_dueno_publicacion(postulacion, user_id)
-
-            if postulacion.estado != "pendiente":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Solo se pueden aceptar postulaciones pendientes",
-                )
-
             id_conversacion = await self.repository.aceptar_postulacion(
                 postulacion_id=postulacion_id,
-                publicacion_id=pub_id,
+                user_id=str(user_id),
             )
-            # Sincronizar estado de la publicación a "acuerdo"
-            await self.repository.actualizar_estado_publicacion(pub_id, "acuerdo")
-
-            # Notificar al trabajador que su oferta fue aceptada
-            try:
-                prestador_uid = getattr(postulacion, "prestador_id", None)
-                if prestador_uid:
-                    notif = Notificacion(
-                        usuario_id=prestador_uid,
-                        titulo="¡Tu oferta fue aceptada!",
-                        mensaje="El cliente ha seleccionado tu propuesta. ¡Comunícate por mensaje para coordinar los detalles!",
-                        tipo="oferta_aceptada",
-                        referencia_id=pub_id,
-                    )
-                    self.repository.db.add(notif)
-                    await self.repository.db.commit()
-            except Exception as e:
-                print("Error creando notificación de aceptación:", e)
-
             return {
                 "message": "Postulación aceptada correctamente",
                 "id_conversacion": id_conversacion,
                 "estado": "aceptada",
             }
 
+        postulacion = await self.get_postulacion(postulacion_id)
         if nuevo_estado == EstadoPostulacion.rechazada:
             await self._verificar_dueno_publicacion(postulacion, user_id)
             if postulacion.estado not in ("pendiente", "en_espera"):
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Solo se pueden rechazar postulaciones pendientes",
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Solo se pueden rechazar postulaciones pendientes o en espera",
                 )
             return await self.repository.update(
                 postulacion_id,
                 {"estado": nuevo_estado.value},
             )
 
+        if nuevo_estado == EstadoPostulacion.retirada:
+            return await self.retirar_postulacion(postulacion_id, user_id)
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Estado de postulación no permitido",
         )
+
+    async def retirar_postulacion(self, postulacion_id: str, prestador_id: str):
+        postulacion = await self.repository.retirar_postulacion(
+            postulacion_id=postulacion_id,
+            prestador_id=str(prestador_id),
+        )
+        return {
+            "message": "Postulación retirada correctamente",
+            "id": str(postulacion.id),
+            "estado": postulacion.estado,
+            "retirada_at": postulacion.retirada_at,
+        }
 
     async def revertir_aceptacion(self, postulacion_id: str, user_id: str):
         """Si el cliente se arrepiente, vuelve la postulación aceptada a pendiente."""
@@ -199,17 +179,33 @@ class PostulacionService:
         postulacion = await self.get_postulacion(postulacion_id)
         await self._verificar_dueno_postulacion(postulacion, prestador_id)
 
+        if postulacion.estado == "aceptada":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede eliminar una postulación aceptada",
+            )
+
+        if postulacion.estado in ("pendiente", "en_espera"):
+            return await self.retirar_postulacion(postulacion_id, prestador_id)
+
         await self.repository.delete(postulacion_id)
         return {"message": "Postulación eliminada correctamente"}
 
     @staticmethod
-    def _serializar_postulacion(postulacion, incluir_prestador: bool) -> dict:
+    def _serializar_postulacion(
+        postulacion,
+        incluir_prestador: bool,
+        ocupado: bool = False,
+        publicacion=None,
+    ) -> dict:
         prestador = None
         if incluir_prestador and postulacion.prestador:
             usuario = postulacion.prestador.usuario
             prestador = {
                 "id": str(postulacion.prestador.id),
                 "descripcion": postulacion.prestador.descripcion,
+                "disponible": not ocupado,
+                "ocupado": ocupado,
                 "usuario": {
                     "id": str(usuario.id),
                     "nombre_completo": usuario.nombre_completo,
@@ -219,6 +215,10 @@ class PostulacionService:
 
         conversacion = postulacion.conversacion
         return {
+            "distancia_km": (
+                distancia_km(postulacion.prestador, publicacion)
+                if publicacion is not None and incluir_prestador else None
+            ),
             "id": str(postulacion.id),
             "publicacion_id": str(postulacion.publicacion_id),
             "prestador_id": str(postulacion.prestador_id),

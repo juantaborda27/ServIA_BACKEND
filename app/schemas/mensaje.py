@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class MensajeCreate(BaseModel):
     id_remitente: UUID
-    contenido: str = Field(..., min_length=1, max_length=500)
+    contenido: str = Field(..., min_length=1, max_length=1000)
     id_conversacion: UUID
     id_destinatario: UUID
 

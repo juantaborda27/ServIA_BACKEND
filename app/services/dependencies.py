@@ -62,8 +62,9 @@ def get_publicacion_service(
     return PublicacionService(repository)
 def get_mensaje_service(
     repository: MensajeRepository = Depends(get_mensaje_repository),
+    conversacion_repository: ConversacionRepository = Depends(get_conversacion_repository),
 ) -> MensajeService:
-    return MensajeService(repository)
+    return MensajeService(repository, conversacion_repository)
 
 
 def get_conversacion_service(

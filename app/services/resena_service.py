@@ -70,18 +70,21 @@ class ResenaService:
         cliente_foto = resena.cliente.foto_perfil if resena.cliente else None
 
         # Notificar al prestador sobre la nueva calificación
-        try:
-            notif = Notificacion(
-                usuario_id=data.prestador_id,
-                titulo="¡Nueva calificación recibida!",
-                mensaje=f"{cliente_nombre} te ha calificado con {data.calificacion} estrellas: \"{data.comentario}\"",
-                tipo="calificacion_recibida",
-                referencia_id=data.publicacion_id,
-            )
-            self.repository.db.add(notif)
-            await self.repository.db.commit()
-        except Exception as e:
-            print("Error creando notificación de reseña:", e)
+        notif = Notificacion(
+            usuario_id=data.prestador_id,
+            titulo="¡Nueva calificación recibida!",
+            mensaje=f"{cliente_nombre} te ha calificado con {data.calificacion} estrellas: \"{data.comentario}\"",
+            tipo="calificacion_recibida",
+            referencia_id=data.publicacion_id,
+            data={
+                "role": "profesional",
+                "destination": "reviews",
+                "publication_id": str(data.publicacion_id),
+                "review_id": str(resena.id),
+            },
+        )
+        self.repository.db.add(notif)
+        await self.repository.db.commit()
 
         return ResenaResponse(
             id=str(resena.id),

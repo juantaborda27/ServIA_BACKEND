@@ -9,6 +9,7 @@ class EstadoPostulacion(str, Enum):
     aceptada = "aceptada"
     rechazada = "rechazada"
     en_espera = "en_espera"
+    retirada = "retirada"
 
 
 class PostulacionCreate(BaseModel):

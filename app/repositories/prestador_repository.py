@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.especialidad import Especialidad
+from app.models.postulacion import Postulacion
 from app.models.prestador import Prestador
+from app.models.publicacion import Publicacion
 
 
 class PrestadorRepository:
@@ -49,8 +51,24 @@ class PrestadorRepository:
             selectinload(Prestador.especialidades).selectinload(Especialidad.categoria),
         )
 
-        if disponible is not None:
-            stmt = stmt.where(Prestador.disponible == disponible)
+        trabajo_activo = (
+            select(Postulacion.id)
+            .join(Publicacion, Publicacion.id == Postulacion.publicacion_id)
+            .where(
+                Postulacion.prestador_id == Prestador.id,
+                Postulacion.estado == "aceptada",
+                Publicacion.estado.in_([
+                    "acuerdo",
+                    "en_progreso",
+                    "pendiente_confirmacion",
+                ]),
+            )
+            .exists()
+        )
+        if disponible is True:
+            stmt = stmt.where(~trabajo_activo)
+        elif disponible is False:
+            stmt = stmt.where(trabajo_activo)
 
         if verificado is not None:
             stmt = stmt.where(Prestador.verificado == verificado)
@@ -70,6 +88,23 @@ class PrestadorRepository:
 
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def tiene_trabajo_activo(self, prestador_id: str) -> bool:
+        stmt = (
+            select(Postulacion.id)
+            .join(Publicacion, Publicacion.id == Postulacion.publicacion_id)
+            .where(
+                Postulacion.prestador_id == prestador_id,
+                Postulacion.estado == "aceptada",
+                Publicacion.estado.in_([
+                    "acuerdo",
+                    "en_progreso",
+                    "pendiente_confirmacion",
+                ]),
+            )
+            .limit(1)
+        )
+        return (await self.db.execute(stmt)).scalar_one_or_none() is not None
 
     async def update(self, prestador_id: str, data: dict) -> Optional[Prestador]:
         stmt = select(Prestador).where(Prestador.id == prestador_id)

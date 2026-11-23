@@ -18,6 +18,7 @@ router = APIRouter(
 
 @router.get("", response_model=ListaNotificacionesResponse)
 async def list_mis_notificaciones(
+    rol: str = Query("cliente", pattern="^(cliente|profesional)$"),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
     current_user = Depends(get_current_user),
@@ -26,6 +27,7 @@ async def list_mis_notificaciones(
     """Retorna las notificaciones del usuario autenticado ordenadas de la más reciente a la más antigua."""
     return await services.list_notificaciones(
         user_id=current_user.id,
+        rol=rol,
         limit=limit,
         offset=offset
     )
@@ -34,11 +36,12 @@ async def list_mis_notificaciones(
 @router.patch("/{notificacion_id}/leer")
 async def marcar_notificacion_leida(
     notificacion_id: str,
+    rol: str = Query("cliente", pattern="^(cliente|profesional)$"),
     current_user = Depends(get_current_user),
     services: NotificacionService = Depends(get_notificacion_service),
 ):
     """Marca una notificación específica como leída."""
-    ok = await services.mark_as_read(notificacion_id, current_user.id)
+    ok = await services.mark_as_read(notificacion_id, current_user.id, rol)
     if not ok:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -49,22 +52,24 @@ async def marcar_notificacion_leida(
 
 @router.patch("/leer-todas")
 async def marcar_todas_leidas(
+    rol: str = Query("cliente", pattern="^(cliente|profesional)$"),
     current_user = Depends(get_current_user),
     services: NotificacionService = Depends(get_notificacion_service),
 ):
     """Marca todas las notificaciones pendientes del usuario como leídas."""
-    marcadas = await services.mark_all_as_read(current_user.id)
+    marcadas = await services.mark_all_as_read(current_user.id, rol)
     return {"message": f"{marcadas} notificaciones marcadas como leídas"}
 
 
 @router.delete("/{notificacion_id}")
 async def eliminar_notificacion(
     notificacion_id: str,
+    rol: str = Query("cliente", pattern="^(cliente|profesional)$"),
     current_user = Depends(get_current_user),
     services: NotificacionService = Depends(get_notificacion_service),
 ):
     """Elimina una notificación del usuario."""
-    ok = await services.delete_notificacion(notificacion_id, current_user.id)
+    ok = await services.delete_notificacion(notificacion_id, current_user.id, rol)
     if not ok:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

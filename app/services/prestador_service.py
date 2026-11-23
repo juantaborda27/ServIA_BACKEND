@@ -40,7 +40,26 @@ class PrestadorService:
                 detail="Prestador no encontrado"
             )
 
-        return self._flatten_categorias(prestador)
+        ocupado = await self.repository.tiene_trabajo_activo(prestador_id)
+        return self._flatten_categorias(prestador, ocupado)
+
+    async def get_ubicacion(self, prestador_id):
+        prestador = await self.repository.get_by_id(prestador_id)
+        if prestador is None:
+            raise HTTPException(status_code=404, detail="Prestador no encontrado")
+        return {
+            "latitud": prestador.base_latitud,
+            "longitud": prestador.base_longitud,
+            "direccion": prestador.base_direccion,
+        }
+
+    async def guardar_ubicacion(self, prestador_id, ubicacion):
+        await self.get_ubicacion(prestador_id)
+        await self.repository.update(
+            prestador_id,
+            {f"base_{campo}": valor for campo, valor in ubicacion.model_dump().items()},
+        )
+        return await self.get_ubicacion(prestador_id)
 
     async def list_prestadores(
         self,
@@ -59,7 +78,13 @@ class PrestadorService:
             offset=offset,
         )
 
-        return [self._flatten_categorias(p) for p in prestadores]
+        return [
+            self._flatten_categorias(
+                p,
+                await self.repository.tiene_trabajo_activo(str(p.id)),
+            )
+            for p in prestadores
+        ]
 
     async def update_prestador(
         self,
@@ -71,7 +96,11 @@ class PrestadorService:
         prestador = await self.get_prestador(prestador_id)
         await self._verificar_dueno(prestador, user_id)
 
-        update_data = data.model_dump(exclude_unset=True, mode="json", exclude={"categoria_ids"})
+        update_data = data.model_dump(
+            exclude_unset=True,
+            mode="json",
+            exclude={"categoria_ids", "disponible"},
+        )
 
         if update_data:
             await self.repository.update(prestador_id, update_data)
@@ -108,9 +137,13 @@ class PrestadorService:
         return {c.key: getattr(obj, c.key) for c in inspect(obj).mapper.column_attrs}
 
     @classmethod
-    def _flatten_categorias(cls, prestador) -> dict:
+    def _flatten_categorias(cls, prestador, ocupado: bool = False) -> dict:
 
         data = cls._model_to_dict(prestador)
+        for field in ("base_latitud", "base_longitud", "base_direccion"):
+            data.pop(field, None)
+        data["disponible"] = not ocupado
+        data["ocupado"] = ocupado
 
         # Aplanar datos del usuario relacionado (antes: prestador.pop("usuario", None))
         usuario = getattr(prestador, "usuario", None)

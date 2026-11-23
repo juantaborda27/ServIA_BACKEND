@@ -38,6 +38,22 @@ class Publicacion(Base):
     estado: Mapped[str] = mapped_column(
         EstadoPublicacionEnum, nullable=False, server_default="activo"
     )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completion_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelled_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -46,7 +62,10 @@ class Publicacion(Base):
     )
 
     categoria: Mapped["Categoria"] = relationship(back_populates="publicaciones")
-    usuario: Mapped["Usuario"] = relationship(back_populates="publicaciones")
+    usuario: Mapped["Usuario"] = relationship(
+        back_populates="publicaciones",
+        foreign_keys=[usuario_id],
+    )
     postulaciones: Mapped[list["Postulacion"]] = relationship(
         back_populates="publicacion", cascade="all, delete-orphan"
     )

@@ -1,12 +1,13 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, get_optional_user
 from app.services.dependencies import get_publicacion_service
 from app.services.post_service import PublicacionService
 from app.schemas.post import (
     EstadoPublicacion,
+    PublicacionCancelarRequest,
     PublicacionCreate,
     PublicacionEstadoUpdate,
     PublicacionUpdate,
@@ -41,7 +42,7 @@ async def list_publicaciones(
     offset: int = Query(0, ge=0),
     services: PublicacionService = Depends(get_publicacion_service)
 ):
-    return await services.list_publicaciones(
+    return await services.list_publicaciones_visibles(
         estado=estado.value if estado else None,
         categoria_id=categoria_id,
         usuario_id=usuario_id,
@@ -59,7 +60,7 @@ async def get_publicaciones_categorias_prestador(
     current_user=Depends(get_current_user),
     services: PublicacionService = Depends(get_publicacion_service)
 ):
-    return await services.list_publicaciones(
+    return await services.list_publicaciones_visibles(
         prestador_id=current_user.id,
         estado="activo",
         barrio=barrio,
@@ -80,7 +81,11 @@ async def get_publicaciones_by_usuario(
 
 @router.get("/trabajos")
 async def get_trabajos_prestador(
-    tipo: str = Query("activos", description="'activos' o 'completados'"),
+    tipo: str = Query(
+        "activos",
+        pattern="^(activos|historial|completados)$",
+        description="'activos' o 'historial' ('completados' se conserva como alias)",
+    ),
     current_user=Depends(get_current_user),
     services: PublicacionService = Depends(get_publicacion_service)
 ):
@@ -116,12 +121,43 @@ async def completar_trabajo(
     )
 
 
+@router.patch("/{publicacion_id}/confirmar-finalizacion")
+async def confirmar_finalizacion_trabajo(
+    publicacion_id: str,
+    current_user=Depends(get_current_user),
+    services: PublicacionService = Depends(get_publicacion_service),
+):
+    """El cliente confirma la finalizaciÃ³n y libera al profesional."""
+    return await services.confirmar_finalizacion(
+        publicacion_id=publicacion_id,
+        user_id=current_user.id,
+    )
+
+
+@router.patch("/{publicacion_id}/cancelar")
+async def cancelar_trabajo(
+    publicacion_id: str,
+    data: Optional[PublicacionCancelarRequest] = Body(default=None),
+    current_user=Depends(get_current_user),
+    services: PublicacionService = Depends(get_publicacion_service),
+):
+    """Cancela una publicación/servicio según permisos y estado."""
+    return await services.cancelar_trabajo(
+        publicacion_id=publicacion_id,
+        user_id=current_user.id,
+        motivo=data.motivo if data else None,
+    )
+
+
 @router.get("/{publicacion_id}")
 async def get_publicacion(
     publicacion_id: str,
+    current_user=Depends(get_optional_user),
     services: PublicacionService = Depends(get_publicacion_service)
 ):
-    return await services.get_publicacion(publicacion_id)
+    return await services.get_publicacion_visible(
+        publicacion_id, current_user.id if current_user else None,
+    )
 
 
 @router.put("/{publicacion_id}")

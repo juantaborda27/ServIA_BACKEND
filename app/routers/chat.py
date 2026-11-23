@@ -1,12 +1,17 @@
-from fastapi import APIRouter, WebSocket, WebSocketException, status, WebSocketDisconnect, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, WebSocketException, status
 from fastapi.responses import HTMLResponse
+from pydantic import ValidationError
 from app.core.security import decode_token, InvalidTokenError
+from app.dependencies.auth import get_current_user
 from app.services.dependencies import get_mensaje_service
 from app.services.mensaje_service import MensajeService
 from app.schemas.mensaje import MensajeCreate, MensajeResponse
 from app.core.connectionManager import ConnectionManager
 import json
+import logging
 import uuid
+
+logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/chat",
     tags=["Chat"]
@@ -77,47 +82,81 @@ async def get():
 @router.get(
     "/conversacion/{conversacion_id}",
     response_model=list[MensajeResponse])
-async def get_chat(conversacion_id: uuid.UUID,services: MensajeService = Depends(get_mensaje_service)):
-     return await services.listar_mensajes_por_conversacion(conversacion_id)
-    
+async def get_chat(
+    conversacion_id: uuid.UUID,
+    rol: str = Query("cliente", pattern="^(cliente|profesional)$"),
+    current_user=Depends(get_current_user),
+    services: MensajeService = Depends(get_mensaje_service),
+):
+    return await services.listar_mensajes_por_conversacion(conversacion_id, current_user.id, rol)
+
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str, services: MensajeService = Depends(get_mensaje_service)):
-    is_conected = False
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str,
+    rol: str = Query("cliente", pattern="^(cliente|profesional)$"),
+    services: MensajeService = Depends(get_mensaje_service),
+):
+    is_connected = False
     user_id = None
     try:
         user_id = decode_token(token).get("sub")
         if not user_id:
             raise InvalidTokenError("Token inválido o expirado")
-        await manager_connection.connect(user_id, websocket)
-        is_conected = True
+        connection_key = manager_connection.build_key(user_id, rol)
+        await manager_connection.connect(connection_key, websocket)
+        is_connected = True
         while True:
-            data = await websocket.receive_text()
-            data = json.loads(data)
-            destino = data["destino"]
-            mensaje = data["mensaje"]
-            id_conversacion = data["id_conversacion"]
-            datos = {
-            "id_remitente": user_id,
-            "id_destinatario": destino,
-            "contenido": mensaje,
-            "id_conversacion": id_conversacion}
-            datos = MensajeCreate(**datos)
-            
-            await services.crear_mensaje(datos)
-            connections=manager_connection.get_connections(destino)
-            for ws in connections:
+            raw_data = await websocket.receive_text()
+            try:
+                payload = json.loads(raw_data)
+                datos = MensajeCreate(
+                    id_remitente=user_id,
+                    id_destinatario=payload["destino"],
+                    contenido=payload["mensaje"],
+                    id_conversacion=payload["id_conversacion"],
+                )
+            except (json.JSONDecodeError, KeyError, TypeError, ValidationError) as exc:
+                await websocket.send_json({"type": "error", "detail": f"Payload inválido: {exc}"})
+                continue
+
+            try:
+                mensaje_guardado = await services.crear_mensaje(datos, rol)
+            except HTTPException as exc:
+                await websocket.send_json({"type": "error", "detail": exc.detail})
+                continue
+
+            evento = {
+                "type": "message",
+                "message": {
+                    "id_mensaje": str(mensaje_guardado.id_mensaje),
+                    "contenido": mensaje_guardado.contenido,
+                    "id_conversacion": str(mensaje_guardado.id_conversacion),
+                    "id_remitente": str(mensaje_guardado.id_remitente),
+                    "id_destinatario": str(mensaje_guardado.id_destinatario),
+                    "fecha_hora": mensaje_guardado.fecha_hora.isoformat() if mensaje_guardado.fecha_hora else None,
+                },
+            }
+
+            destino_str = str(mensaje_guardado.id_destinatario)
+            rol_destino = "profesional" if rol == "cliente" else "cliente"
+            destino_key = manager_connection.build_key(destino_str, rol_destino)
+            for ws in manager_connection.get_connections(destino_key):
                 try:
-                    await ws.send_text(f"Message text was: {mensaje}")
+                    await ws.send_json(evento)
                 except (WebSocketDisconnect, RuntimeError) as e:
-                    print(f"Error sending message to {destino}: {e}")
-                    manager_connection.disconnect(destino, ws)
-                
+                    logger.warning("Error enviando mensaje WS a %s: %s", destino_str, e)
+                    manager_connection.disconnect(destino_key, ws)
+
+            await websocket.send_json(evento)
+
     except WebSocketDisconnect:
-        print(f"User {user_id} disconnected")
+        logger.info("Usuario %s desconectado de WS", user_id)
     except InvalidTokenError:
-            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Token inválido o expirado")
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Token inválido o expirado")
     finally:
-        if is_conected:
-            manager_connection.disconnect(user_id, websocket)
+        if is_connected and user_id:
+            connection_key = manager_connection.build_key(user_id, rol)
+            manager_connection.disconnect(connection_key, websocket)
 

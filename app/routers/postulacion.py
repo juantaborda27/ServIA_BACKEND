@@ -68,7 +68,7 @@ async def get_postulacion(
     services: PostulacionService = Depends(get_postulacion_service)
 ):
 
-    return await services.get_postulacion(postulacion_id)
+    return await services.get_postulacion_visible(postulacion_id)
 
 
 @router.put("/{postulacion_id}")
@@ -110,6 +110,19 @@ async def revertir_aceptacion_postulacion(
     return await services.revertir_aceptacion(
         postulacion_id,
         current_user.id
+    )
+
+
+@router.patch("/{postulacion_id}/retirar")
+@router.post("/{postulacion_id}/retirar")
+async def retirar_postulacion(
+    postulacion_id: str,
+    current_user=Depends(get_current_user),
+    services: PostulacionService = Depends(get_postulacion_service),
+):
+    return await services.retirar_postulacion(
+        postulacion_id,
+        current_user.id,
     )
 
 

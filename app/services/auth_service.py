@@ -1,7 +1,13 @@
 from fastapi import HTTPException, status
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import RegisterRequest, LoginRequest, RefreshRequest, TokenResponse
-from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.security import (
+    InvalidTokenError,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    verify_password,
+)
 
 
 class AuthService:
@@ -41,7 +47,7 @@ class AuthService:
     async def refresh(self, data: RefreshRequest) -> dict:
         try:
             payload = decode_token(data.refresh_token)
-        except ValueError:
+        except InvalidTokenError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Refresh token inválido o expirado"

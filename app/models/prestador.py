@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,6 +18,9 @@ class Prestador(Base):
         primary_key=True,
     )
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    base_latitud: Mapped[float | None] = mapped_column(Float, nullable=True)
+    base_longitud: Mapped[float | None] = mapped_column(Float, nullable=True)
+    base_direccion: Mapped[str | None] = mapped_column(Text, nullable=True)
     disponible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     verificado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     fecha_creacion: Mapped[datetime] = mapped_column(

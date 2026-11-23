@@ -32,7 +32,9 @@ class Usuario(Base):
         back_populates="usuario", uselist=False, cascade="all, delete-orphan"
     )
     publicaciones: Mapped[list["Publicacion"]] = relationship(
-        back_populates="usuario", cascade="all, delete-orphan"
+        back_populates="usuario",
+        foreign_keys="Publicacion.usuario_id",
+        cascade="all, delete-orphan",
     )
     mensajes_enviados: Mapped[list["Mensaje"]] = relationship(
         foreign_keys="Mensaje.id_remitente",

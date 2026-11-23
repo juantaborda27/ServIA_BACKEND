@@ -6,6 +6,7 @@ load_dotenv(override=True)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+CHAT_RETENTION_DAYS = int(os.getenv("CHAT_RETENTION_DAYS", "30"))
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:

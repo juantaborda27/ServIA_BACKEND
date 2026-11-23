@@ -6,7 +6,7 @@ from app.dependencies.auth import get_current_user
 from app.services.dependencies import get_prestador_service
 from app.services.prestador_service import PrestadorService
 
-from app.schemas.prestador import PrestadorCreate, PrestadorUpdate
+from app.schemas.prestador import PrestadorCreate, PrestadorUpdate, UbicacionPrestador
 
 
 router = APIRouter(
@@ -54,6 +54,23 @@ async def get_mi_perfil_prestador(
     services: PrestadorService = Depends(get_prestador_service)
 ):
     return await services.get_prestador(current_user.id)
+
+
+@router.get("/mi-ubicacion")
+async def get_mi_ubicacion(
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service),
+):
+    return await services.get_ubicacion(current_user.id)
+
+
+@router.put("/mi-ubicacion")
+async def put_mi_ubicacion(
+    data: UbicacionPrestador,
+    current_user=Depends(get_current_user),
+    services: PrestadorService = Depends(get_prestador_service),
+):
+    return await services.guardar_ubicacion(current_user.id, data)
 
 
 @router.get("/{prestador_id}")

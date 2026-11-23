@@ -19,6 +19,7 @@ class NotificacionResponse(BaseModel):
     tipo: str
     leida: bool
     referencia_id: Optional[str] = None
+    data: Optional[Any] = None
     created_at: Any
 
 

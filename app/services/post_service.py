@@ -1,6 +1,10 @@
 from typing import Optional
 
 from fastapi import HTTPException, status
+from fastapi.encoders import jsonable_encoder
+
+from app.core.ubicacion import distancia_km
+from app.repositories.prestador_repository import PrestadorRepository
 
 from app.repositories.post_repository import PublicacionRepository
 from app.schemas.post import (
@@ -72,6 +76,47 @@ class PublicacionService:
         update_data = data.model_dump(exclude_unset=True, mode="json")
         return await self.repository.update(publicacion_id, update_data)
 
+    @staticmethod
+    def _publicacion_visible(publicacion, prestador=None, detalle_privado=False):
+        data = jsonable_encoder(publicacion, exclude={"usuario", "resenas"})
+        if not detalle_privado:
+            for field in ("direccion", "referencia", "latitud", "longitud"):
+                data[field] = None
+        data["distancia_km"] = distancia_km(prestador, publicacion)
+        data["solicitud_tiene_punto"] = publicacion.latitud is not None and publicacion.longitud is not None
+        data["prestador_tiene_punto"] = bool(
+            prestador and prestador.base_latitud is not None and prestador.base_longitud is not None
+        )
+        return data
+
+    async def list_publicaciones_visibles(self, prestador_id=None, **filters):
+        publicaciones = await self.list_publicaciones(prestador_id=prestador_id, **filters)
+        prestador = None
+        if prestador_id is not None:
+            prestador = await PrestadorRepository(self.repository.db).get_by_id(prestador_id)
+        return [self._publicacion_visible(pub, prestador) for pub in publicaciones]
+
+    async def get_publicacion_visible(self, publicacion_id, user_id=None):
+        publicacion = await self.get_publicacion(publicacion_id)
+        if user_id is None:
+            return self._publicacion_visible(publicacion)
+        if publicacion.usuario_id == user_id:
+            return self._publicacion_visible(publicacion, detalle_privado=True)
+        asignada = await self.repository.get_postulacion_aceptada(publicacion_id)
+        prestador = await PrestadorRepository(self.repository.db).get_by_id(user_id)
+        return self._publicacion_visible(
+            publicacion,
+            prestador,
+            detalle_privado=asignada is not None and asignada.prestador_id == user_id,
+        )
+
+    TRANSICIONES_PERMITIDAS = {
+        "activo": {"acuerdo", "cancelado"},
+        "acuerdo": {"en_progreso", "cancelado"},
+        "en_progreso": {"pendiente_confirmacion", "cancelado"},
+        "pendiente_confirmacion": {"terminado", "cancelado"},
+    }
+
     async def cambiar_estado(
         self,
         publicacion_id: str,
@@ -79,34 +124,55 @@ class PublicacionService:
         user_id: str,
     ):
         publicacion = await self.get_publicacion(publicacion_id)
-        await self._verificar_dueno(publicacion, user_id)
+        permitidos = self.TRANSICIONES_PERMITIDAS.get(publicacion.estado, set())
+        if nuevo_estado.value not in permitidos:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Transición no permitida de '{publicacion.estado}' a '{nuevo_estado.value}'",
+            )
 
-        return await self.repository.update(
-            publicacion_id,
-            {"estado": nuevo_estado.value}
+        if nuevo_estado == EstadoPublicacion.cancelado:
+            return await self.cancelar_trabajo(publicacion_id, user_id)
+        if nuevo_estado == EstadoPublicacion.en_progreso:
+            return await self.iniciar_trabajo(publicacion_id, user_id)
+        if nuevo_estado == EstadoPublicacion.terminado:
+            return await self.confirmar_finalizacion(publicacion_id, user_id)
+        if nuevo_estado == EstadoPublicacion.pendiente_confirmacion:
+            return await self.completar_trabajo(publicacion_id, user_id)
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Usa el endpoint específico de aceptación de oferta para pasar a 'acuerdo'",
         )
 
     async def iniciar_trabajo(self, publicacion_id: str, user_id: str):
-        """El prestador o cliente inicia formalmente el trabajo."""
-        publicacion = await self.get_publicacion(publicacion_id)
-        return await self.repository.update(
-            publicacion_id,
-            {"estado": "en_progreso"}
-        )
+        """Solo el prestador asignado puede iniciar un servicio en estado 'acuerdo'."""
+        return await self.repository.iniciar_trabajo_atomico(publicacion_id, str(user_id))
 
     async def completar_trabajo(self, publicacion_id: str, user_id: str):
-        """Finaliza el trabajo; tras esto se activará la reseña obligatoria."""
-        publicacion = await self.get_publicacion(publicacion_id)
-        return await self.repository.update(
-            publicacion_id,
-            {"estado": "terminado"}
+        """El prestador asignado solicita confirmaciÃ³n de finalizaciÃ³n."""
+        return await self.repository.solicitar_finalizacion_atomico(publicacion_id, str(user_id))
+
+    async def confirmar_finalizacion(self, publicacion_id: str, user_id: str):
+        """Solo el cliente propietario confirma y termina definitivamente el servicio."""
+        return await self.repository.confirmar_finalizacion_atomico(publicacion_id, str(user_id))
+
+    async def cancelar_trabajo(
+        self,
+        publicacion_id: str,
+        user_id: str,
+        motivo: Optional[str] = None,
+    ):
+        """Cancela el servicio, libera al prestador y cierra la conversación si aplica."""
+        return await self.repository.cancelar_trabajo_atomico(
+            publicacion_id, str(user_id), motivo
         )
 
     async def get_trabajos_prestador(self, prestador_id: str, tipo: str = "activos"):
-        if tipo == "completados":
-            estados = ["terminado"]
+        if tipo in ("historial", "completados"):
+            estados = ["terminado", "cancelado"]
         else:
-            estados = ["acuerdo", "en_progreso"]
+            estados = ["acuerdo", "en_progreso", "pendiente_confirmacion"]
 
         return await self.repository.get_trabajos_prestador(prestador_id, estados)
 
