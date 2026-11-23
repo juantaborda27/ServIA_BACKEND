@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS prestadores (
     descripcion TEXT,
     disponible BOOLEAN DEFAULT TRUE NOT NULL,
     verificado BOOLEAN DEFAULT FALSE NOT NULL,
+    saldo NUMERIC(12, 2) DEFAULT 0.0 NOT NULL,
     fecha_creacion TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 

@@ -79,6 +79,43 @@ websocket_connections = {}
 async def get():
     return HTMLResponse(html)
 
+@router.get("/no-leidos")
+async def get_mensajes_no_leidos(
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(func.count(Notificacion.id)).where(
+        Notificacion.usuario_id == current_user.id,
+        Notificacion.tipo == "chat",
+        Notificacion.leida == False,
+    )
+    result = await db.execute(stmt)
+    count = result.scalar() or 0
+    return {"no_leidos": count}
+
+
+@router.patch("/marcar-leidos")
+async def marcar_mensajes_leidos(
+    conversacion_id: Optional[uuid.UUID] = None,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = (
+        update(Notificacion)
+        .where(
+            Notificacion.usuario_id == current_user.id,
+            Notificacion.tipo == "chat",
+            Notificacion.leida == False,
+        )
+    )
+    if conversacion_id:
+        stmt = stmt.where(Notificacion.referencia_id == str(conversacion_id))
+    stmt = stmt.values(leida=True)
+    await db.execute(stmt)
+    await db.commit()
+    return {"message": "Mensajes marcados como leídos"}
+
+
 @router.get(
     "/conversacion/{conversacion_id}",
     response_model=list[MensajeResponse])
@@ -101,7 +138,8 @@ async def websocket_endpoint(
     is_connected = False
     user_id = None
     try:
-        user_id = decode_token(token).get("sub")
+        payload = decode_token(token)
+        user_id = payload.get("sub")
         if not user_id:
             raise InvalidTokenError("Token inválido o expirado")
         connection_key = manager_connection.build_key(user_id, rol)

@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from app.core.ubicacion import distancia_km
 
 from app.models.notificacion import Notificacion
+from app.models.prestador import Prestador
 from app.repositories.post_repository import PublicacionRepository
 from app.repositories.postulacion_repository import PostulacionRepository
 from app.services.post_service import PublicacionService
@@ -125,6 +126,7 @@ class PostulacionService:
                 "message": "Postulación aceptada correctamente",
                 "id_conversacion": id_conversacion,
                 "estado": "aceptada",
+                "comision_cobrada": comision_7,
             }
 
         postulacion = await self.get_postulacion(postulacion_id)

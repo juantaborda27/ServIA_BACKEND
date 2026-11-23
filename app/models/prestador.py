@@ -23,6 +23,9 @@ class Prestador(Base):
     base_direccion: Mapped[str | None] = mapped_column(Text, nullable=True)
     disponible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     verificado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    saldo: Mapped[float] = mapped_column(
+        Numeric(12, 2), default=0.0, server_default=text("0.0"), nullable=False
+    )
     fecha_creacion: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

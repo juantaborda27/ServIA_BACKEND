@@ -52,8 +52,9 @@ def get_servicio_service(
 
 def get_prestador_service(
     repository: PrestadorRepository = Depends(get_prestador_repository),
+    publicacion_repository: PublicacionRepository = Depends(get_publicacion_repository),
 ) -> PrestadorService:
-    return PrestadorService(repository)
+    return PrestadorService(repository, publicacion_repository)
 
 
 def get_publicacion_service(

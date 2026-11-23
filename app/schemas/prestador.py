@@ -47,6 +47,10 @@ class PrestadorUpdate(BaseModel):
     categoria_ids: Optional[list[UUID]] = None
 
 
+class RecargarSaldoRequest(BaseModel):
+    monto: float = Field(..., gt=0)
+
+
 class PrestadorResponse(PrestadorBase):
     id: UUID
     fecha_creacion: datetime
