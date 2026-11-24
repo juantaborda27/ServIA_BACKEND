@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, File, Query, UploadFile
 
 from app.dependencies.auth import get_current_user, get_optional_user
 from app.services.dependencies import get_publicacion_service
@@ -158,6 +158,16 @@ async def get_publicacion(
     return await services.get_publicacion_visible(
         publicacion_id, current_user.id if current_user else None,
     )
+
+
+@router.post("/{publicacion_id}/imagenes")
+async def upload_publicacion_images(
+    publicacion_id: str,
+    files: list[UploadFile] = File(...),
+    current_user=Depends(get_current_user),
+    services: PublicacionService = Depends(get_publicacion_service),
+):
+    return await services.upload_images(publicacion_id, files, current_user.id)
 
 
 @router.put("/{publicacion_id}")

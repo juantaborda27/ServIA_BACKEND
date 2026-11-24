@@ -11,7 +11,7 @@ from app.models.notificacion import Notificacion
 from app.services.dependencies import get_mensaje_service
 from app.services.mensaje_service import MensajeService
 from app.schemas.mensaje import MensajeCreate, MensajeResponse
-from app.core.connectionManager import ConnectionManager
+from app.core.connectionManager import manager_connection
 import json
 import logging
 import uuid
@@ -21,8 +21,6 @@ router = APIRouter(
     prefix="/chat",
     tags=["Chat"]
 )
-
-manager_connection = ConnectionManager()
 
 html = """
 <!DOCTYPE html>
@@ -185,12 +183,7 @@ async def websocket_endpoint(
             destino_str = str(mensaje_guardado.id_destinatario)
             rol_destino = "profesional" if rol == "cliente" else "cliente"
             destino_key = manager_connection.build_key(destino_str, rol_destino)
-            for ws in manager_connection.get_connections(destino_key):
-                try:
-                    await ws.send_json(evento)
-                except (WebSocketDisconnect, RuntimeError) as e:
-                    logger.warning("Error enviando mensaje WS a %s: %s", destino_str, e)
-                    manager_connection.disconnect(destino_key, ws)
+            await manager_connection.broadcast(destino_key, evento)
 
             await websocket.send_json(evento)
 

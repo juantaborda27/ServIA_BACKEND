@@ -4,6 +4,7 @@ from app.models.especialidad import Especialidad
 from app.models.postulacion import Postulacion
 from app.models.prestador import Prestador
 from app.models.publicacion import Publicacion
+from app.models.publicacion_imagen import PublicacionImagen
 from app.models.resena import Resena
 from app.models.servicio import Servicio
 from app.models.usuario import Usuario
@@ -17,6 +18,7 @@ __all__ = [
     "Postulacion",
     "Prestador",
     "Publicacion",
+    "PublicacionImagen",
     "Resena",
     "Servicio",
     "Usuario",

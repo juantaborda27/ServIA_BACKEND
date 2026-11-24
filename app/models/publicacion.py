@@ -22,9 +22,7 @@ class Publicacion(Base):
         UUID(as_uuid=True), ForeignKey("categorias.id"), nullable=False
     )
     urgencia: Mapped[str] = mapped_column(NivelUrgenciaEnum, nullable=False)
-    # NOTA: en la DB el default es auth.uid() (función de Supabase Auth).
-    # No se replica aquí: asigna este valor desde tu lógica de negocio
-    # (id del usuario autenticado) al crear la publicación.
+    # El usuario autenticado se asigna desde la lógica de negocio al crear la publicación.
     usuario_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False
     )
@@ -71,4 +69,11 @@ class Publicacion(Base):
     )
     resenas: Mapped[list["Resena"]] = relationship(
         back_populates="publicacion", cascade="all, delete-orphan"
+    )
+    imagenes: Mapped[list["PublicacionImagen"]] = relationship(
+        back_populates="publicacion",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PublicacionImagen.created_at",
+        lazy="selectin",
     )

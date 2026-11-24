@@ -113,7 +113,7 @@ class Publicaciones(Base):
     descripcion: Mapped[str] = mapped_column(Text, nullable=False)
     categoria_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     urgencia: Mapped[NivelUrgencia] = mapped_column(Enum(NivelUrgencia, values_callable=lambda cls: [member.value for member in cls], name='nivel_urgencia'), nullable=False)
-    usuario_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, server_default=text('auth.uid()'))
+    usuario_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     estado: Mapped[EstadoPublicacion] = mapped_column(Enum(EstadoPublicacion, values_callable=lambda cls: [member.value for member in cls], name='estado_publicacion'), nullable=False, server_default=text("'activo'::estado_publicacion"))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))

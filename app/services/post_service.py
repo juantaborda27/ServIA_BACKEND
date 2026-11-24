@@ -1,9 +1,10 @@
 from typing import Optional
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 
 from app.core.ubicacion import distancia_km
+from app.core.storage import image_storage
 from app.repositories.prestador_repository import PrestadorRepository
 
 from app.repositories.post_repository import PublicacionRepository
@@ -78,7 +79,7 @@ class PublicacionService:
 
     @staticmethod
     def _publicacion_visible(publicacion, prestador=None, detalle_privado=False):
-        data = jsonable_encoder(publicacion, exclude={"usuario", "resenas"})
+        data = jsonable_encoder(publicacion, exclude={"usuario", "resenas", "imagenes"})
         if not detalle_privado:
             for field in ("direccion", "referencia", "latitud", "longitud"):
                 data[field] = None
@@ -87,7 +88,47 @@ class PublicacionService:
         data["prestador_tiene_punto"] = bool(
             prestador and prestador.base_latitud is not None and prestador.base_longitud is not None
         )
+        data["imagenes"] = [
+            {
+                "id": str(image.id),
+                "url": image_storage.signed_url(image.s3_key),
+                "content_type": image.content_type,
+            }
+            for image in getattr(publicacion, "imagenes", [])
+        ]
         return data
+
+    async def upload_images(
+        self,
+        publicacion_id: str,
+        files: list[UploadFile],
+        user_id: str,
+    ):
+        publicacion = await self.get_publicacion(publicacion_id)
+        await self._verificar_dueno(publicacion, user_id)
+
+        if not files:
+            raise HTTPException(status_code=400, detail="Envía al menos una imagen")
+        if len(publicacion.imagenes) + len(files) > 5:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Una publicación puede tener como máximo 5 imágenes",
+            )
+
+        stored = []
+        try:
+            for file in files:
+                stored.append(await image_storage.upload(publicacion_id, file))
+            publicacion = await self.repository.add_images(
+                publicacion_id,
+                [(image.key, image.content_type) for image in stored],
+            )
+        except Exception:
+            for image in stored:
+                await image_storage.delete(image.key)
+            raise
+
+        return self._publicacion_visible(publicacion, detalle_privado=True)
 
     async def list_publicaciones_visibles(self, prestador_id=None, **filters):
         publicaciones = await self.list_publicaciones(prestador_id=prestador_id, **filters)
@@ -181,6 +222,8 @@ class PublicacionService:
         await self._verificar_dueno(publicacion, user_id)
 
         await self.repository.delete(publicacion_id)
+        for image in publicacion.imagenes:
+            await image_storage.delete(image.s3_key)
         return {"message": "Publicación eliminada correctamente"}
 
     @staticmethod

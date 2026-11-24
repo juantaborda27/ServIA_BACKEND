@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.routers import auth
 from app.routers import usuario
@@ -14,6 +15,8 @@ from app.routers import notificacion
 from app.routers import categoria
 from app.routers import ubicacion
 from app.core.database import engine, Base
+from app.core.connectionManager import manager_connection
+from app.core.seed import seed_categorias
 from app import models
 from contextlib import asynccontextmanager
 #from app.core.database_function import crear_funciones
@@ -21,9 +24,16 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
+        # Evita carreras cuando las dos tareas ECS arrancan al mismo tiempo.
+        await conn.execute(text("SELECT pg_advisory_xact_lock(hashtext('servia_schema_init'))"))
         await conn.run_sync(Base.metadata.create_all)
+        await seed_categorias(conn)
         #await crear_funciones(conn)
-    yield
+    await manager_connection.start()
+    try:
+        yield
+    finally:
+        await manager_connection.stop()
 app = FastAPI(
     title="DataBaseServIA API",
     description="API para plataforma de servicios de Valledupar",

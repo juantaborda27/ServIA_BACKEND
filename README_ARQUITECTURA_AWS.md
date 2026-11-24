@@ -202,7 +202,6 @@ Abre [`credentials.ps1`](credentials.ps1) y pega el bloque obtenido en **AWS Det
 ## 📌 Resumen de Cumplimiento de Requisitos
 
 * ✅ **Arquitectura en 3 Capas:** Presentación (S3/CloudFront), Aplicación (EC2 ASG + Docker), Datos (RDS PostgreSQL).
-* ✅ **Eliminación Total de Dependencias Externas:** Supabase eliminado al 100%; migrado a PostgreSQL nativo.
 * ✅ **Alta Disponibilidad Multi-AZ:** ASG repartido en `us-east-1a` y `us-east-1b` (min=2, desired=2); RDS Multi-AZ sincrónico.
 * ✅ **Seguridad por Capas:** Subredes públicas para ALB, subredes privadas para datos, SGs encadenados por referencia.
 * ✅ **Compatibilidad AWS Learner Lab:** Detección de token de sesión STS, compatibilidad con `LabInstanceProfile`, manejo de cuotas de EIP y políticas de expiración.

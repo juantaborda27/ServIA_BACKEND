@@ -69,8 +69,10 @@ $LogGroupDbInit  = "/ecs/servia-db-init"
 $SecretDbUrl     = "servia/database-url"
 $SecretDbPass    = "servia/db-password"
 $SecretJwt       = "servia/jwt-secret"
+$SecretRedisUrl  = "servia/redis-url"
 $DbPassword      = "PasswordSegura123"
 $JwtSecret       = "_Av13cu#7-LfUNXa+xMUz6Y"
+$RedisUrl        = if ($env:REDIS_URL) { $env:REDIS_URL.Trim() } else { "" }
 $ImageTag        = "v" + (Get-Date -Format "yyyyMMdd-HHmmss")
 
 # Carpeta temporal para JSON de la CLI y contexto Docker del frontend
@@ -586,6 +588,13 @@ function Set-PlainSecret {
 $SecretDbUrlArn  = Set-PlainSecret -Name $SecretDbUrl  -Value "postgresql+asyncpg://postgres:${DbPassword}@${RdsEndpoint}:5432/servia_db" -Desc "ServIA DATABASE_URL (asyncpg)"
 $SecretDbPassArn = Set-PlainSecret -Name $SecretDbPass -Value $DbPassword -Desc "ServIA contrasena maestra de RDS"
 $SecretJwtArn    = Set-PlainSecret -Name $SecretJwt    -Value $JwtSecret  -Desc "ServIA JWT secret key"
+$SecretRedisUrlArn = $null
+if ($RedisUrl) {
+    $SecretRedisUrlArn = Set-PlainSecret -Name $SecretRedisUrl -Value $RedisUrl -Desc "ServIA Redis URL para chat distribuido"
+} else {
+    Write-Host "  -> REDIS_URL no fue suministrada; el backend usara WebSockets locales." -ForegroundColor DarkYellow
+    Write-Host "     Antes de desplegar en multiples tareas: `$env:REDIS_URL='rediss://endpoint:6379/0'" -ForegroundColor DarkYellow
+}
 
 # =============================================================================
 # FASE 9: TASK DEFINITIONS (BACKEND, FRONTEND E INICIALIZACION DE BD)
@@ -618,6 +627,14 @@ function Register-TaskDef {
 }
 
 # 9.1 Backend FastAPI (0.5 vCPU / 1 GB)
+$BackendSecrets = @(
+    [ordered]@{ name = "DATABASE_URL";   valueFrom = $SecretDbUrlArn },
+    [ordered]@{ name = "JWT_SECRET_KEY"; valueFrom = $SecretJwtArn }
+)
+if ($SecretRedisUrlArn) {
+    $BackendSecrets += [ordered]@{ name = "REDIS_URL"; valueFrom = $SecretRedisUrlArn }
+}
+
 $TdBackendArn = Register-TaskDef -FileName "td_backend.json" -Def ([ordered]@{
     family                  = $TdBackend
     networkMode             = "awsvpc"
@@ -633,11 +650,12 @@ $TdBackendArn = Register-TaskDef -FileName "td_backend.json" -Def ([ordered]@{
             image            = $ImageBackend
             essential        = $true
             portMappings     = @( [ordered]@{ containerPort = 8000; protocol = "tcp"; appProtocol = "http" } )
-            environment      = @( [ordered]@{ name = "PYTHONUNBUFFERED"; value = "1" } )
-            secrets          = @(
-                [ordered]@{ name = "DATABASE_URL";   valueFrom = $SecretDbUrlArn },
-                [ordered]@{ name = "JWT_SECRET_KEY"; valueFrom = $SecretJwtArn }
+            environment      = @(
+                [ordered]@{ name = "PYTHONUNBUFFERED";  value = "1" },
+                [ordered]@{ name = "REDIS_REQUIRED";    value = $(if ($SecretRedisUrlArn) { "true" } else { "false" }) },
+                [ordered]@{ name = "REDIS_CHAT_CHANNEL"; value = "servia:chat:events" }
             )
+            secrets          = $BackendSecrets
             logConfiguration = (New-LogConfig -Group $LogGroupBackend -Prefix "backend")
         }
     )

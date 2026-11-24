@@ -1,0 +1,117 @@
+name: Backend CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: servia_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/servia_test
+      JWT_SECRET_KEY: github-actions-test-secret-with-at-least-32-characters
+      REDIS_URL: redis://127.0.0.1:6379/0
+      REDIS_REQUIRED: "true"
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt pytest pytest-asyncio
+      - run: pytest -q
+      - run: docker build -t servia-backend:${{ github.sha }} .
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ vars.AWS_ECR_REPOSITORY }}
+        run: |
+          docker build -t "$REGISTRY/$REPOSITORY:${GITHUB_SHA}" -t "$REGISTRY/$REPOSITORY:latest" .
+          docker push "$REGISTRY/$REPOSITORY:${GITHUB_SHA}"
+          docker push "$REGISTRY/$REPOSITORY:latest"
+
+      - name: Run database migrations inside the VPC
+        env:
+          CLUSTER: ${{ vars.AWS_ECS_CLUSTER }}
+          SERVICE: ${{ vars.AWS_ECS_SERVICE }}
+        run: |
+          NETWORK=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].networkConfiguration' --output json)
+          TASK_DEFINITION=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
+          OVERRIDES='{"containerOverrides":[{"name":"api","command":["alembic","upgrade","head"]}]}'
+          TASK_ARN=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$TASK_DEFINITION" --launch-type FARGATE --network-configuration "$NETWORK" --overrides "$OVERRIDES" --query 'tasks[0].taskArn' --output text)
+          test "$TASK_ARN" != "None"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
+          EXIT_CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" --output json | jq -r '.tasks[0].containers[] | select(.name == "api") | .exitCode')
+          test "$EXIT_CODE" = "0"
+
+      - name: Deploy latest image
+        run: >-
+          aws ecs update-service
+          --cluster "${{ vars.AWS_ECS_CLUSTER }}"
+          --service "${{ vars.AWS_ECS_SERVICE }}"
+          --force-new-deployment
+          --query 'service.serviceArn'
+          --output text
+
+      - name: Wait for ECS stability
+        run: >-
+          aws ecs wait services-stable
+          --cluster "${{ vars.AWS_ECS_CLUSTER }}"
+          --services "${{ vars.AWS_ECS_SERVICE }}"
+

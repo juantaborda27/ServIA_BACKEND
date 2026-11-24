@@ -14,6 +14,7 @@ from app.models.notificacion import Notificacion
 from app.models.postulacion import Postulacion
 from app.models.prestador import Prestador
 from app.models.publicacion import Publicacion
+from app.models.publicacion_imagen import PublicacionImagen
 
 
 class PublicacionRepository:
@@ -35,6 +36,7 @@ class PublicacionRepository:
                 selectinload(Publicacion.usuario),
                 selectinload(Publicacion.categoria),
                 selectinload(Publicacion.resenas),
+                selectinload(Publicacion.imagenes),
             )
             .where(Publicacion.id == publicacion_id)
         )
@@ -62,6 +64,7 @@ class PublicacionRepository:
         if incluir_categoria:
             options.append(selectinload(Publicacion.categoria))
         options.append(selectinload(Publicacion.resenas))
+        options.append(selectinload(Publicacion.imagenes))
         stmt = stmt.options(*options)
 
         if prestador_id:
@@ -111,6 +114,7 @@ class PublicacionRepository:
                 selectinload(Publicacion.usuario),
                 selectinload(Publicacion.categoria),
                 selectinload(Publicacion.resenas),
+                selectinload(Publicacion.imagenes),
                 selectinload(Postulacion.conversacion),
             )
             .where(Postulacion.prestador_id == prestador_id)
@@ -211,6 +215,24 @@ class PublicacionRepository:
                 "updated_at": pub.updated_at.isoformat() if pub.updated_at else None,
             })
         return trabajos
+
+    async def add_images(
+        self,
+        publicacion_id: str,
+        images: list[tuple[str, str]],
+    ) -> Publicacion:
+        self.db.add_all(
+            [
+                PublicacionImagen(
+                    publicacion_id=publicacion_id,
+                    s3_key=key,
+                    content_type=content_type,
+                )
+                for key, content_type in images
+            ]
+        )
+        await self.db.commit()
+        return await self.get_by_id(publicacion_id)
 
     async def update(self, publicacion_id: str, data: dict) -> Optional[Publicacion]:
         stmt = select(Publicacion).where(Publicacion.id == publicacion_id)

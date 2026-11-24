@@ -81,3 +81,4 @@ class PublicacionResponse(BaseModel):
     updated_at: Any
     categoria: Optional[Any] = None
     usuario: Optional[Any] = None
+    imagenes: list[Any] = Field(default_factory=list)
