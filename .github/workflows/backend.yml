@@ -20,9 +20,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: servia_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: servia
+          POSTGRES_USER: servia_admin
+          POSTGRES_PASSWORD: 12345678
         ports:
           - 5432:5432
         options: >-
@@ -41,9 +41,9 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/servia_test
+      DATABASE_URL: postgresql+asyncpg://servia_admin:12345678@servia-prod-postgres.cycfyqrqlnyh.us-east-1.rds.amazonaws.com:5432/servia
       JWT_SECRET_KEY: github-actions-test-secret-with-at-least-32-characters
-      REDIS_URL: redis://127.0.0.1:6379/0
+      REDIS_URL: redis://master.servia-prod-redis.kouajo.use1.cache.amazonaws.com:6379:6379/0
       REDIS_REQUIRED: "true"
 
     steps:
