@@ -26,7 +26,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -U servia_admin -d servia"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -41,20 +41,24 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://servia_admin:12345678@servia-prod-postgres.cycfyqrqlnyh.us-east-1.rds.amazonaws.com:5432/servia
+      DATABASE_URL: postgresql+asyncpg://servia_admin:12345678@localhost:5432/servia
       JWT_SECRET_KEY: github-actions-test-secret-with-at-least-32-characters
-      REDIS_URL: redis://master.servia-prod-redis.kouajo.use1.cache.amazonaws.com:6379:6379/0
+      REDIS_URL: redis://localhost:6379/0
       REDIS_REQUIRED: "true"
 
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt pytest pytest-asyncio
-      - run: pytest -q
-      - run: docker build -t servia-backend:${{ github.sha }} .
+      - name: Run database migrations
+        run: alembic upgrade head
+      - name: Run tests
+        run: pytest -q
+      - name: Build Docker image
+        run: docker build -t servia-backend:${{ github.sha }} .
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -114,4 +118,3 @@ jobs:
           aws ecs wait services-stable
           --cluster "${{ vars.AWS_ECS_CLUSTER }}"
           --services "${{ vars.AWS_ECS_SERVICE }}"
-
