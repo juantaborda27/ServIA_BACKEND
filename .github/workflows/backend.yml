@@ -54,18 +54,21 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt pytest pytest-asyncio
 
-      - name: Initialize base database schema
+      - name: Initialize base schema and seed data
         run: |
           python -c "
           import asyncio
-          from app.database import engine, Base
+          from app.core.database import engine, Base
+          from app.core.seed import seed_categorias
           import app.models
 
-          async def init_models():
+          async def init_db():
               async with engine.begin() as conn:
                   await conn.run_sync(Base.metadata.create_all)
+                  await seed_categorias(conn)
+              await engine.dispose()
 
-          asyncio.run(init_models())
+          asyncio.run(init_db())
           "
 
       - name: Run database migrations
