@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 
 from app.dependencies.auth import get_current_user
 
@@ -35,6 +35,15 @@ async def update_my_profile(
         current_user.id,
         data
     )
+
+
+@router.post("/me/foto-perfil")
+async def upload_my_profile_photo(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    services: UsuarioService = Depends(get_usuario_service),
+):
+    return await services.upload_profile_photo(current_user.id, file)
 
 
 @router.delete("/me")

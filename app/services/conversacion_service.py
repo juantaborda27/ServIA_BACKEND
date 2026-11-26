@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 
+from app.core.storage import image_storage
 from app.models.conversacion import Conversacion
 from app.repositories.conversacion_repository import ConversacionRepository
 from app.schemas.conversacion import ConversacionUpdate
@@ -73,7 +74,7 @@ class ConversacionService:
             "partner": {
                 "id": str(partner_user.id),
                 "nombre_completo": partner_user.nombre_completo,
-                "foto_perfil": partner_user.foto_perfil,
+                "foto_perfil": image_storage.resolve_url(partner_user.foto_perfil),
             } if partner_user else None,
             "last_message": {
                 "contenido": last_msg.contenido,

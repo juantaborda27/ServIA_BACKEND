@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 
+from app.core.storage import image_storage
 from app.models.notificacion import Notificacion
 from app.repositories.post_repository import PublicacionRepository
 from app.repositories.resena_repository import ResenaRepository
@@ -67,7 +68,9 @@ class ResenaService:
 
         resena = await self.repository.create(payload)
         cliente_nombre = resena.cliente.nombre_completo if resena.cliente else "Cliente"
-        cliente_foto = resena.cliente.foto_perfil if resena.cliente else None
+        cliente_foto = image_storage.resolve_url(
+            resena.cliente.foto_perfil if resena.cliente else None
+        )
 
         # Notificar al prestador sobre la nueva calificación
         notif = Notificacion(
@@ -116,7 +119,9 @@ class ResenaService:
                     comentario=r.comentario,
                     created_at=r.created_at.isoformat() if r.created_at else None,
                     cliente_nombre=r.cliente.nombre_completo if r.cliente else "Cliente",
-                    cliente_foto=r.cliente.foto_perfil if r.cliente else None,
+                    cliente_foto=image_storage.resolve_url(
+                        r.cliente.foto_perfil if r.cliente else None
+                    ),
                 )
             )
 
@@ -141,7 +146,9 @@ class ResenaService:
             comentario=resena.comentario,
             created_at=resena.created_at.isoformat() if resena.created_at else None,
             cliente_nombre=resena.cliente.nombre_completo if resena.cliente else "Cliente",
-            cliente_foto=resena.cliente.foto_perfil if resena.cliente else None,
+            cliente_foto=image_storage.resolve_url(
+                resena.cliente.foto_perfil if resena.cliente else None
+            ),
         )
 
     async def get_resena_pendiente(self, cliente_id: str) -> Optional[dict]:

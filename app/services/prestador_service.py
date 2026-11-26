@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy import inspect
 
+from app.core.storage import image_storage
 from app.repositories.prestador_repository import PrestadorRepository
 from app.schemas.prestador import PrestadorCreate, PrestadorUpdate
 
@@ -214,7 +215,7 @@ class PrestadorService:
         if usuario:
             data["nombre_completo"] = usuario.nombre_completo
             data["telefono"] = usuario.telefono
-            data["foto_perfil"] = usuario.foto_perfil
+            data["foto_perfil"] = image_storage.resolve_url(usuario.foto_perfil)
             data["ubicacion"] = usuario.ubicacion
             data["fecha_registro"] = usuario.fecha_registro
             data["activo"] = usuario.activo

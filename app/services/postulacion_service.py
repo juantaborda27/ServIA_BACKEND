@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from app.core.ubicacion import distancia_km
+from app.core.storage import image_storage
 
 from app.models.notificacion import Notificacion
 from app.models.prestador import Prestador
@@ -210,7 +211,7 @@ class PostulacionService:
                 "usuario": {
                     "id": str(usuario.id),
                     "nombre_completo": usuario.nombre_completo,
-                    "foto_perfil": usuario.foto_perfil,
+                    "foto_perfil": image_storage.resolve_url(usuario.foto_perfil),
                 },
             }
 

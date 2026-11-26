@@ -51,7 +51,7 @@ class S3ImageStorage:
                 detail="El contenido del archivo no corresponde a una imagen permitida",
             )
 
-    async def upload(self, publication_id: str, file: UploadFile) -> StoredImage:
+    async def _upload(self, key_prefix: str, file: UploadFile, too_large_message: str) -> StoredImage:
         self._require_configured()
         content_type = (file.content_type or "").lower()
         extension = ALLOWED_IMAGE_TYPES.get(content_type)
@@ -65,13 +65,13 @@ class S3ImageStorage:
         if len(content) > MAX_PUBLICATION_IMAGE_BYTES:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="Cada imagen debe pesar como máximo 12 MB",
+                detail=too_large_message,
             )
         if not content:
             raise HTTPException(status_code=400, detail="La imagen está vacía")
         self._validate_signature(content, content_type)
 
-        key = f"publicaciones/{publication_id}/{uuid.uuid4()}.{extension}"
+        key = f"{key_prefix}/{uuid.uuid4()}.{extension}"
         await asyncio.to_thread(
             self.client.put_object,
             Bucket=self.bucket,
@@ -82,9 +82,30 @@ class S3ImageStorage:
         )
         return StoredImage(key=key, content_type=content_type)
 
+    async def upload(self, publication_id: str, file: UploadFile) -> StoredImage:
+        return await self._upload(
+            f"publicaciones/{publication_id}",
+            file,
+            "Cada imagen debe pesar como máximo 12 MB",
+        )
+
+    async def upload_profile(self, user_id: str, file: UploadFile) -> StoredImage:
+        return await self._upload(
+            f"usuarios/{user_id}/perfil",
+            file,
+            "La foto de perfil debe pesar como máximo 12 MB",
+        )
+
     async def delete(self, key: str):
         if self.client and self.bucket:
             await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=key)
+
+    def resolve_url(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        if value.startswith(("https://", "http://")):
+            return value
+        return self.signed_url(value)
 
     def signed_url(self, key: str) -> str | None:
         if not self.client or not self.bucket:

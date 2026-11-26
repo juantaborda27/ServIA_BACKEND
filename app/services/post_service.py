@@ -215,7 +215,12 @@ class PublicacionService:
         else:
             estados = ["acuerdo", "en_progreso", "pendiente_confirmacion"]
 
-        return await self.repository.get_trabajos_prestador(prestador_id, estados)
+        trabajos = await self.repository.get_trabajos_prestador(prestador_id, estados)
+        for trabajo in trabajos:
+            cliente = trabajo.get("cliente")
+            if cliente:
+                cliente["foto_perfil"] = image_storage.resolve_url(cliente.get("foto_perfil"))
+        return trabajos
 
     async def delete_publicacion(self, publicacion_id: str, user_id: str):
         publicacion = await self.get_publicacion(publicacion_id)
