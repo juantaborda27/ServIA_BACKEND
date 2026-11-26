@@ -54,13 +54,13 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt pytest pytest-asyncio
 
-      - name: Initialize base schema and seed data
+      - name: Initialize base schema, seed data, and stamp Alembic
         run: |
           python -c "
           import asyncio
+          import app.main
           from app.core.database import engine, Base
           from app.core.seed import seed_categorias
-          import app.models
 
           async def init_db():
               async with engine.begin() as conn:
@@ -70,9 +70,7 @@ jobs:
 
           asyncio.run(init_db())
           "
-
-      - name: Run database migrations
-        run: alembic upgrade head
+          alembic stamp head
 
       - name: Run tests
         run: pytest -q
