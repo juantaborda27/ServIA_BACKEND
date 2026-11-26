@@ -53,10 +53,27 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt pytest pytest-asyncio
+
+      - name: Initialize base database schema
+        run: |
+          python -c "
+          import asyncio
+          from app.database import engine, Base
+          import app.models
+
+          async def init_models():
+              async with engine.begin() as conn:
+                  await conn.run_sync(Base.metadata.create_all)
+
+          asyncio.run(init_models())
+          "
+
       - name: Run database migrations
         run: alembic upgrade head
+
       - name: Run tests
         run: pytest -q
+
       - name: Build Docker image
         run: docker build -t servia-backend:${{ github.sha }} .
 
