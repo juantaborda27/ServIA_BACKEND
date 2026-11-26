@@ -108,18 +108,22 @@ jobs:
           docker push "$REGISTRY/$REPOSITORY:${GITHUB_SHA}"
           docker push "$REGISTRY/$REPOSITORY:latest"
 
-      - name: Run database migrations inside the VPC
+      - name: Sync Alembic history inside the VPC
         env:
           CLUSTER: ${{ vars.AWS_ECS_CLUSTER }}
           SERVICE: ${{ vars.AWS_ECS_SERVICE }}
         run: |
           NETWORK=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].networkConfiguration' --output json)
           TASK_DEFINITION=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
-          OVERRIDES='{"containerOverrides":[{"name":"api","command":["alembic","upgrade","head"]}]}'
+          OVERRIDES='{"containerOverrides":[{"name":"api","command":["alembic","stamp","head"]}]}'
           TASK_ARN=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$TASK_DEFINITION" --launch-type FARGATE --network-configuration "$NETWORK" --overrides "$OVERRIDES" --query 'tasks[0].taskArn' --output text)
+          echo "Task ARN: $TASK_ARN"
           test "$TASK_ARN" != "None"
           aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
-          EXIT_CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" --output json | jq -r '.tasks[0].containers[] | select(.name == "api") | .exitCode')
+          TASK_INFO=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" --output json)
+          echo "$TASK_INFO" | jq -r '.tasks[0] | "Stopped reason: \(.stoppedReason // "N/A")"'
+          EXIT_CODE=$(echo "$TASK_INFO" | jq -r '.tasks[0].containers[] | select(.name == "api") | .exitCode')
+          echo "Container exit code: $EXIT_CODE"
           test "$EXIT_CODE" = "0"
 
       - name: Deploy latest image
